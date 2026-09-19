@@ -56,10 +56,14 @@ jobs:
           test -s site/index.html
           test -s site/3d/index.html
           test -s site/modular/index.html
+          test -s modular-preview-src/experiments/modular-garden/src/route-geometry.js
+          grep -q 'DEFAULT_PACE=1.15' modular-preview-src/experiments/modular-garden/src/main.js
           grep -q '/marblebench-ios/modular/assets/' site/modular/index.html
           grep -q '3rd Person' site/modular/index.html
           grep -q '1st Person' site/modular/index.html
           find site/modular/assets -maxdepth 1 -name '*.js' -size +100k -print -quit | grep -q .
+          printf '{"featureCommit":"%s","pagesWorkflowCommit":"%s"}\n' "$(git -C modular-preview-src rev-parse HEAD)" "$GITHUB_SHA" > site/modular/build-info.json
+          cat site/modular/build-info.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
