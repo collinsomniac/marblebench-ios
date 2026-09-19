@@ -1,38 +1,43 @@
 # MarbleBench iOS — Marble Garden
 
-A fully client-side kinetic marble sculpture and an experimental iPhone browser-performance lab. The current **v0.2 reference prototype** is a simplified 2D JavaScript-physics game with optional WebGPU-instanced marbles and a complete Canvas 2D fallback. It is **not** a validated physical-iPhone benchmark or GPU physics engine.
+An entirely client-side kinetic marble sculpture and experimental mobile browser performance lab. **Neither prototype has been benchmarked on a physical iPhone yet.** GitHub Pages serves the application as static assets with no backend.
 
-## Play on iPhone
+## Play
 
-Once Pages is enabled and the deployment finishes, visit **https://collinsomniac.github.io/marblebench-ios/** in Safari or Chrome. The game is static: no application server, login, build tools, or ZIP extraction is needed on the phone.
+- **Original 2D reference:** https://collinsomniac.github.io/marblebench-ios/
+- **Experimental 3D garden:** https://collinsomniac.github.io/marblebench-ios/3d/
 
-**GitHub Pages setup:** in this repository go to **Settings → Pages → Build and deployment → Source: GitHub Actions**. The included `.github/workflows/pages.yml` deploys the `site/` directory on pushes to `main`. The URL is a *target*, not a claim that Pages is live; a 404 indicates it has not been enabled/deployed yet. The first visit needs an internet connection; the optional service worker caches the app shell on a best-effort basis.
+The 2D game remains the working baseline; the 3D route is an experimental WebGL 2 renderer and might uncover iOS shader/driver problems. The 3D version is not yet a WebGPU implementation, full rigid-body solver or computational fluid simulation. If a game cannot initialize, it shows a meaningful error rather than claiming to have loaded successfully.
 
-Downloading `dist/marble-garden.html` and opening it from the iOS Files app or a chat preview is **not** a reliable execution path: those interfaces may preview HTML without executing JavaScript and need not offer Safari in Open With. Use the HTTPS game URL instead.
+## 3D experiment
 
-## Controls and implementation
+`site/3d/` contains four first-party static resources: `index.html`, `physics.js`, `render.js`, and `main.js`. No npm, external JavaScript CDN, assets, API key or application server is needed to open the deployed game.
 
-Tap the garden to release a marble, or use **+12 marbles**, **Pause**, **Bench**, or **Reset**. A simplified discrete 2D physics solver implements gravity, track segments, bumpers, rotating paddles, and a spatial-grid broad phase. Marbles recirculate via a teleport/reset mechanism rather than a physically simulated elevator. Fixed simulation timestep: 120 Hz, with at most eight catch-up steps per animation callback. Rendering follows `requestAnimationFrame` without an imposed frame-rate cap; the display and browser still limit actual presented frames.
+The sculpture combines an inclined track, vortex collector, rotating wheel, oscillating paddle, buoyant pool, fountain and marble-entry droplets. Marbles recirculate through a **guided return**, not a mechanically simulated lift. This reference physics is approximate; adding Rapier's real 3D colliders, dynamic joints and contact events is the next fidelity milestone.
 
-Canvas 2D starts gameplay immediately. WebGPU initializes independently and may fail or hang without blocking the game. The FPS display estimates **rAF callback cadence, not presented/composited FPS**. The `Bench` control blocks the main thread briefly for a **CPU-only** 120-step microbenchmark; it does not time GPU work. Device-pixel ratio is currently capped at 2 to limit render-target memory, not frame rate.
+**Controls:** `+ Marble`, Pause, Orbit, and Tune. Inside Tune: marble flow (default 0.7/s), capacity (90), rendered resolution (default up to 1.25× DPR), simulation speed, droplets, and water/particle toggles. Drag to orbit, pinch to zoom. Rendering has no imposed FPS limit, but browser scheduling and display refresh still control delivered frames. Metrics distinguish rAF callback intervals (p50/p95), CPU simulation cost, optional async GPU timer, draws/frame, steps/sec and backbuffer size. A missing GPU timer is shown as *unavailable*, not zero.
 
-The progress bar shows initialization stages, **not transferred bytes**. There are no large streamed models, audio, fonts, external JS dependencies, neural-network inference, native Neural Engine access, or threaded WASM in v0.2. Real iOS WebGPU, thermal, battery, memory, shader-compatibility, and sustained-performance tests remain to be performed.
+The one-canvas WebGL 2 renderer shares box and sphere geometries, batches instances, draws water with an inexpensive procedural shader and droplets with GPU point sprites. It does **not** access the iPhone Neural Engine or perform WebGPU compute physics. Review [3D research and limitations](docs/THREE_D_RESEARCH.md) for mechanical references, benchmarking rules and future React Three Fiber / Rapier comparison plans.
 
-## Repository
+## Original 2D reference
 
-- `site/`: static HTTPS entry point (`index.html`, `main.js`, `sw.js`); publish this directory.
-- `tools/build.py`: creates optional self-contained HTML and a ZIP-based draft PortableWeb `.pweb` package.
-- `tests/test_smoke.py`: Chromium mobile-viewport tests; **not physical-device validation**.
-- `docs/RESEARCH.md`: research and benchmark plan.
-- `.github/workflows/pages.yml`: GitHub Actions Pages deployment.
+The v0.2 prototype runs simplified CPU physics at 120 Hz with up to eight catch-up steps per frame. Canvas 2D starts immediately; WebGPU may render its marbles independently. This hybrid still redraws the Canvas backdrop, so apparent stutter may be due to main-thread work, frame pacing, GPU cost or browser scheduling—not an explicit 30 FPS cap.
+
+Use the HTTPS URLs on iPhone. Downloading a local HTML file and opening it through Files or an in-chat preview is not a dependable browser execution workflow.
+
+## Development and portable distribution
 
 ```bash
-python3 tools/build.py
 python3 -m http.server 8000 --directory site
-# Visit http://localhost:8000/
+# Visit http://localhost:8000/3d/
+node tests/test_3d.mjs
+python3 tools/build_3d.py
+python3 tools/build.py
 python3 -m unittest discover -s tests -v
 ```
 
-Tests require the Playwright Python package plus a compatible Chromium executable (`/usr/bin/chromium` in the current test script). The generated `dist/` files are not required for GitHub Pages.
+`tools/build_3d.py` generates `dist/marblebench-3d.html` (self-contained single-file runtime) and `dist/marblebench-3d.pweb` (draft PortableWeb ZIP including original source). They are optional distribution artifacts; the deployed `/3d/` route uses regular browser modules and static files. The `.pweb` conforms to a subset of the independent draft [PortableWeb format](https://github.com/portableweb/spec); running this app in its generic viewer is not verified.
 
-The optional `.pweb` follows the independent, **draft** [PortableWeb specification](https://github.com/portableweb/spec); its viewer's handling of this app, especially WebGPU, is not verified. Arbitrary untrusted bundles must not be executed under the same trusted origin as this game. Original project source is MIT licensed. No API keys or credentials are required.
+The legacy Python tests require Playwright and Chromium; `tests/test_3d.mjs` uses only Node.js. Headless Chromium available during initial development could not create WebGL contexts, so 3D shader compilation, actual rendering and physical-iPhone FPS remain unverified despite the numerical physics regression tests passing. The archived 2D app remains at `/` during validation.
+
+GitHub Actions publishes the `site/` directory on pushes to `main`; see `.github/workflows/pages.yml`. All original project source is MIT licensed. Do not run untrusted third-party packages on this trusted application's origin.
