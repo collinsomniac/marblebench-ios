@@ -23,6 +23,8 @@ jobs:
           node --check site/3d/main.js
           node --check site/3d/physics.js
           node --check site/3d/render.js
+      - name: Validate frame pacing diagnostic
+        run: node tests/test_diagnostics.mjs
       - name: Run deterministic 3D physics regression
         run: node tests/test_3d.mjs
       - name: Verify standalone and PWEB builds
