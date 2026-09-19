@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {POST_FUNNEL_WAYPOINTS} from './route-geometry.js';
 
 export const MARBLE_RADIUS=0.17;
 export const POOL=Object.freeze({minX:3.1,maxX:6.4,minZ:-1.8,maxZ:.42,floor:.14,level:.86});
@@ -63,13 +64,12 @@ export function buildCourse({RAPIER,world,scene}){
   scene.add(new THREE.Mesh(funnelGeometry,new THREE.MeshStandardMaterial({color:PALETTE.yellow,roughness:.29,metalness:.05,side:THREE.DoubleSide})));
   staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(verts),new Uint32Array(faces)).setFriction(.12)));
   pieces.push({kind:'funnel',radius:FUNNEL.outer,hole:FUNNEL.inner,tag:'vortex'});
-  // Catcher is BELOW the open throat; the post-funnel rail moves behind the loop
-  // in the depth axis and returns to its entry from the outside. The former rail
-  // crossed the loop's rigid collider at x=-1.83 and trapped marbles indefinitely.
+  // Catcher is BELOW the open throat; the downhill path takes a wide U-turn
+  // in depth rather than crossing the loop or gaining height before its entry.
   block([2.51,3.13,-.88],[1.12,.15,1.12],PALETTE.violet,undefined,{tag:'vortex-catch-floor',friction:.15});
   for(const z of [-1.45,-.31])block([2.51,3.36,z],[1.18,.43,.07],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
   block([3.08,3.36,-.88],[.07,.43,1.15],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
-  railPath(sampleSpline([[2.26,3.17,-.88],[1.68,3.01,-.50],[.05,2.83,.16],[-2.7,2.42,.20],[-4.87,2.50,.20],[-4.15,2.04,-.32],[-3.62,1.54,-.88]],48),PALETTE.violet,{width:.72,friction:.19,tag:'post-funnel-overpass'});
+  railPath(sampleSpline(POST_FUNNEL_WAYPOINTS,64),PALETTE.violet,{width:.72,friction:.19,tag:'post-funnel-overpass'});
   railPath([[-3.62,1.54,-.88],[LOOP.x,LOOP.y-LOOP.radius,LOOP.z]],PALETTE.coral,{width:.47,friction:.16,tag:'loop-entry'});
   const loop=[];for(let i=0;i<=64;i++){const a=i/64*Math.PI*2;loop.push([LOOP.x+LOOP.radius*Math.sin(a),LOOP.y-LOOP.radius*Math.cos(a),LOOP.z])}
   railPath(loop,PALETTE.coral,{width:.48,wall:.31,friction:.13,tag:'gravity-loop'});
