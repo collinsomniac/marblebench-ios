@@ -2,12 +2,10 @@ import * as THREE from 'three';
 import {POST_FUNNEL_WAYPOINTS} from './route-geometry.js';
 import {VORTEX_PROFILE,createVortexGeometry} from './vortex-profile.js';
 
-export const MARBLE_RADIUS=0.17;
+export const MARBLE_RADIUS=.17;
 export const POOL=Object.freeze({minX:3.1,maxX:6.4,minZ:-1.8,maxZ:.42,floor:.14,level:.86});
 export const LIFT=Object.freeze({x:-7.25,z:-.88,bottom:-.54,top:7.48,rise:15,bottomDwell:2.8,topDwell:1.7,return:3});
 export const LOOP=Object.freeze({x:-2.57,y:2.23,z:-.88,radius:.70});
-// Physical funnel: a rotationally symmetric hyperbolic-like bowl. No spiral
-// groove or prescribed velocity; the entry rail supplies tangential momentum.
 export const FUNNEL=Object.freeze({x:2.60,z:-.88,y:VORTEX_PROFILE.throatY,inner:VORTEX_PROFILE.inner,outer:VORTEX_PROFILE.outer,rimY:VORTEX_PROFILE.rimY});
 export const COURSE_LABELS=Object.freeze(['Motorized ratchet lift','S-bend','Open vortex','Gravity loop','Spring trampoline','Floating moat','Return conveyor']);
 export const PALETTE=Object.freeze({cyan:0x40c8d4,yellow:0xffd351,coral:0xff7058,violet:0x9c7be8,teal:0x29b3a4,mint:0x76dcbd,dark:0x263c51,cream:0xece8d9,brass:0xc69c57});
@@ -56,19 +54,19 @@ export function buildCourse({RAPIER,world,scene}){
     staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(vertices),new Uint32Array(indices),internalEdges).setFriction(friction).setRestitution(.08)));
   }
   railPath([[-6.78,7.49,-.88],[-6.05,7.30,-.88],[-4.45,6.86,-.88]],PALETTE.coral,{width:.56,friction:.29,tag:'lift-exit'});
-  // Entry is almost tangent to the rear edge of the bowl; it does not aim at
-  // the hole. The marble is free to orbit in either direction after collisions.
-  const bend=sampleSpline([[-4.45,6.86,-.88],[-3.70,6.65,-.88],[-2.60,6.25,-.37],[-1.15,5.81,-1.29],[.09,5.36,-.41],[.75,5.20,-1.26],[1.20,5.09,-1.78],[1.72,5.00,-2.13],[2.33,4.97,-2.21]],56);
+  // The rail ends outside the bowl near its REAL inlet at theta=-2.30;
+  // continuing inside the bowl would create an overlapping shelf that arrests
+  // even an independently injected marble. The ball leaves with tangential
+  // velocity and transitions to the gravity-driven axisymmetric surface.
+  const bend=sampleSpline([[-4.45,6.86,-.88],[-3.70,6.65,-.88],[-2.60,6.25,-.37],[-1.15,5.81,-1.29],[.09,5.36,-.41],[.75,5.20,-1.26],[1.11,5.16,-1.65],[1.49,5.05,-2.12]],44);
   railPath(bend,PALETTE.cyan,{width:.65,friction:.20,tag:'s-bend'});
-  // Share the exact same indexed mesh between visual geometry and collision.
-  // A tall outer lip has a real gap for the tangential inlet; the center is open.
   const well=createVortexGeometry(FUNNEL);
   const funnelGeometry=new THREE.BufferGeometry();funnelGeometry.setAttribute('position',new THREE.BufferAttribute(well.vertices,3));funnelGeometry.setIndex(new THREE.BufferAttribute(well.indices,1));funnelGeometry.computeVertexNormals();
   scene.add(new THREE.Mesh(funnelGeometry,new THREE.MeshStandardMaterial({color:PALETTE.yellow,roughness:.29,metalness:.05,side:THREE.DoubleSide})));
   staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(well.vertices,well.indices,internalEdges).setFriction(.12).setRestitution(.035)));
   pieces.push({kind:'funnel',radius:FUNNEL.outer,hole:FUNNEL.inner,tag:'vortex'});
-  // A deep, largely enclosed physical collector catches marbles without
-  // teleporting them; its west face opens directly onto the post-funnel rail.
+  // Collector below the throat: physical high sidewalls and an open westward
+  // transition, rather than a position-triggered teleport or rebound impulse.
   block([2.51,3.13,-.88],[1.12,.15,1.12],PALETTE.violet,undefined,{tag:'vortex-catch-floor',friction:.15,restitution:.025});
   for(const z of [-1.51,-.25])block([2.51,3.37,z],[1.25,1.12,.09],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
   block([3.12,3.37,-.88],[.09,1.12,1.33],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
