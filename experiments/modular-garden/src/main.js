@@ -7,6 +7,7 @@ const $=id=>document.getElementById(id);
 const canvas=$('world'),overlay=$('loading'),progress=$('fill');
 const query=new URLSearchParams(location.search);
 const requested=query.get('backend')==='webgl2'?'webgl2':'auto';
+const DEFAULT_PACE=1.15; // Reversible presentation choice; physics stays fixed at 120 Hz.
 $('backend').value=requested;
 let renderer=null,sim=null,rig=null,scene=null,camera=null;
 let raf=0,last=0,accumulator=0,steps=0,physicsMs=0,frameIntervals=[],lastHud=0,errors=0;
@@ -47,7 +48,7 @@ function initUI(){
   $('water').addEventListener('change',()=>{sim.options.water=$('water').checked;});
   $('reload').addEventListener('click',()=>{const url=new URL(location.href);url.searchParams.set('backend',$('backend').value);location.assign(url.href);});
   $('copy').addEventListener('click',async()=>{
-    const snapshot=JSON.stringify({at:new Date().toISOString(),simulation:sim.snapshot(),renderer:renderer.backend?.constructor?.name??'unknown',request:requested,viewport:[innerWidth,innerHeight],dpr:renderer.getPixelRatio?.(),displayStats:{fps:$('fps').textContent,frame:$('frameTime').textContent,physics:$('physicsTime').textContent,draws:$('draws').textContent},ua:navigator.userAgent},null,2);
+    const snapshot=JSON.stringify({at:new Date().toISOString(),simulation:sim.snapshot(),settings:{...sim.options},renderer:renderer.backend?.constructor?.name??'unknown',request:requested,viewport:[innerWidth,innerHeight],dpr:renderer.getPixelRatio?.(),displayStats:{fps:$('fps').textContent,frame:$('frameTime').textContent,physics:$('physicsTime').textContent,draws:$('draws').textContent},ua:navigator.userAgent},null,2);
     try{await navigator.clipboard.writeText(snapshot);$('copy').textContent='Copied';}catch{console.info(snapshot);$('copy').textContent='Clipboard unavailable';}
   });
   window.addEventListener('resize',resize,{passive:true});
@@ -107,6 +108,9 @@ async function boot(){
     const fill=new THREE.DirectionalLight(0xb4d9ff,1.05);fill.position.set(8,8,-7);scene.add(fill);
     camera=new THREE.PerspectiveCamera(47,1,.045,110);
     sim=new GardenSimulation(RAPIER,scene);
+    sim.options.speed=DEFAULT_PACE;
+    $('speed').value=String(DEFAULT_PACE);
+    $('speedVal').textContent=DEFAULT_PACE.toFixed(2)+'×';
     phase(55,'Initializing a single GPU renderer…');
     renderer=new THREE.WebGPURenderer({canvas,antialias:true,alpha:false,forceWebGL:requested==='webgl2'});
     await renderer.init();
