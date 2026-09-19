@@ -1,11 +1,12 @@
 import test from 'node:test';
+import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import {GardenSimulation} from '../src/physics.js';
 import {LOOP,LIFT} from '../src/course.js';
 await RAPIER.init();
 
-test('diagnose first marble loop-entry handoff and subsequent mechanisms',()=>{
+test('lead marble reaches the loop entrance and logs later unproven mechanisms',()=>{
  const sim=new GardenSimulation(RAPIER,new THREE.Scene());sim.options.flow=0;
  const event={enteredFunnel:null,passedOldJunction:null,roundedHairpin:null,loopEntry:null,loopApex:null,loopExit:null,padNearby:null,pool:null,return:null,lift:null};
  const samples=[];let minX=Infinity,minZ=Infinity,maxZ=-Infinity,topAfterEntry=-Infinity;
@@ -26,5 +27,9 @@ test('diagnose first marble loop-entry handoff and subsequent mechanisms',()=>{
   if(!event.lift&&sim.time>8&&Math.abs(p.x-LIFT.x)<.65&&p.y>-.9&&p.y<7.7)event.lift={t:sim.time,p};
   if(i%1200===0)samples.push({t:+sim.time.toFixed(1),p:{x:+p.x.toFixed(2),y:+p.y.toFixed(2),z:+p.z.toFixed(2)},speed:+speed.toFixed(2),sleep:ball.body.isSleeping()});
  }
- const b=sim.balls[0];console.log('NEXT_SEGMENT '+JSON.stringify({event,minX,minZ,maxZ,topAfterEntry,losses:sim.losses,samples,final:b?{p:b.body.translation(),v:b.body.linvel(),sleep:b.body.isSleeping()}:null}));sim.dispose();
+ const b=sim.balls[0];console.log('NEXT_SEGMENT '+JSON.stringify({event,minX,minZ,maxZ,topAfterEntry,losses:sim.losses,samples,final:b?{p:b.body.translation(),v:b.body.linvel(),sleep:b.body.isSleeping()}:null}));
+ sim.dispose();
+ assert.ok(event.roundedHairpin,'lead marble must physically negotiate downhill U-turn');
+ assert.ok(event.loopEntry&&event.loopEntry.t<18,'lead marble must reach the loop entrance by 18 simulated seconds');
+ // Do not claim loop completion, rebound, or recirculation until separate trajectory/contact gates exist.
 });
