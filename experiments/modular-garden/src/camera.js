@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {fitOrbitDistance,ORBIT_MIN_DISTANCE,ORBIT_MAX_DISTANCE} from './framing.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 export const FOLLOW_FOV_MULTIPLIER = 1.25;
@@ -8,7 +9,7 @@ const direction = new THREE.Vector3(1, 0, 0);
 const forward = new THREE.Vector3();
 const right = new THREE.Vector3();
 
-/** Camera owns only presentation/input; never writes simulated marble coordinates. */
+/** Camera owns presentation/input only; never writes simulated marble coordinates. */
 export class CameraRig {
   constructor(camera, canvas, movementPad, movementThumb) {
     this.camera = camera;
@@ -22,7 +23,7 @@ export class CameraRig {
     this.eye = new THREE.Vector3(3, 6.5, 19);
     this.yaw = 0.12;
     this.pitch = 0.22;
-    this.distance = 21;
+    this.distance = fitOrbitDistance(camera.aspect,this.baseFov);
     this.followDistance = 2.85;
     this.lookYaw = 0;
     this.lookPitch = 0;
@@ -45,8 +46,6 @@ export class CameraRig {
     }
     if (mode === 'third' || mode === 'first') this.focusId = balls.find(b => b.id === this.focusId)?.id ?? balls[0].id;
     this.mode = mode;
-    // Change projection with mode, not every frame. This is a 25% increase in
-    // VERTICAL FOV (47° -> 58.75°); horizontal FOV also widens at fixed aspect.
     const follow = mode === 'first' || mode === 'third';
     this.camera.fov = follow ? Math.min(105, this.baseFov * FOLLOW_FOV_MULTIPLIER) : this.baseFov;
     this.camera.updateProjectionMatrix();
@@ -83,7 +82,7 @@ export class CameraRig {
         const pinch = Math.hypot(a.x - b.x, a.y - b.y);
         if (this.lastPinch) {
           const ratio = clamp(this.lastPinch / Math.max(pinch, 1), 0.85, 1.15);
-          if (this.mode === 'orbit') this.distance = clamp(this.distance * ratio, 4, 38);
+          if (this.mode === 'orbit') this.distance = clamp(this.distance * ratio, ORBIT_MIN_DISTANCE, ORBIT_MAX_DISTANCE);
           else if (this.mode === 'third') this.followDistance = clamp(this.followDistance * ratio, 1.2, 7);
         }
         if (this.mode === 'orbit') {
@@ -113,7 +112,7 @@ export class CameraRig {
       if (this.mode === 'orbit' || this.mode === 'third') {
         e.preventDefault();
         const key = this.mode === 'orbit' ? 'distance' : 'followDistance';
-        this[key] = clamp(this[key] * Math.exp(e.deltaY * 0.001), key === 'distance' ? 4 : 1.2, key === 'distance' ? 38 : 7);
+        this[key] = clamp(this[key] * Math.exp(e.deltaY * 0.001), key === 'distance' ? ORBIT_MIN_DISTANCE : 1.2, key === 'distance' ? ORBIT_MAX_DISTANCE : 7);
       }
     }, { passive: false });
     this.pad.style.touchAction = 'none';
