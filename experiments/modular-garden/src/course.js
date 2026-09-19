@@ -4,7 +4,9 @@ export const MARBLE_RADIUS=0.17;
 export const POOL=Object.freeze({minX:3.1,maxX:6.4,minZ:-1.8,maxZ:.42,floor:.14,level:.86});
 export const LIFT=Object.freeze({x:-7.25,z:-.88,bottom:-.54,top:7.48,rise:15,bottomDwell:2.8,topDwell:1.7,return:3});
 export const LOOP=Object.freeze({x:-2.57,y:2.23,z:-.88,radius:.70});
-export const FUNNEL=Object.freeze({x:2.60,y:4.04,z:-.88,inner:.26,outer:1.24});
+// A marble is 0.34 wide; the previous 0.52-wide exit trapped spheres at its lip.
+// A 0.98-wide exit provides clearance for one moving marble plus off-axis motion.
+export const FUNNEL=Object.freeze({x:2.60,y:4.04,z:-.88,inner:.49,outer:1.36});
 export const COURSE_LABELS=Object.freeze(['Motorized ratchet lift','S-bend','Open vortex','Gravity loop','Spring trampoline','Floating moat','Return conveyor']);
 export const PALETTE=Object.freeze({cyan:0x40c8d4,yellow:0xffd351,coral:0xff7058,violet:0x9c7be8,teal:0x29b3a4,mint:0x76dcbd,dark:0x263c51,cream:0xece8d9,brass:0xc69c57});
 const V=(x,y,z)=>new THREE.Vector3(x,y,z),UP=V(0,1,0),boxGeometry=new THREE.BoxGeometry(1,1,1);
@@ -33,36 +35,40 @@ export function buildCourse({RAPIER,world,scene}){
       const up=new THREE.Vector3().crossVectors(side,tangent).normalize();
       return {p,tangent,side,up,left:p.clone().addScaledVector(side,-width/2),right:p.clone().addScaledVector(side,width/2)};
     });
-    // One continuous non-box collider per complete lane, with no internal vertical end caps.
     const vertices=[],indices=[];
     function quad(a,b,c,d){const base=vertices.length/3;for(const p of [a,b,c,d])vertices.push(p.x,p.y,p.z);indices.push(base,base+1,base+2,base+1,base+3,base+2)}
     for(let i=1;i<sections.length;i++){
       const a=sections[i-1],b=sections[i];const center=a.p.clone().add(b.p).multiplyScalar(.5);
       const t=b.p.clone().sub(a.p),length=t.length();if(length<.001)continue;t.normalize();
-      const side=new THREE.Vector3().crossVectors(t,UP).normalize(),up=new THREE.Vector3().crossVectors(side,t).normalize();
+      let side=new THREE.Vector3().crossVectors(t,UP);
+      if(side.lengthSq()<1e-8)side.set(0,0,1);else side.normalize();
+      const up=new THREE.Vector3().crossVectors(side,t).normalize();
       const rotation=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(t,up,side));
       block(center.clone().addScaledVector(up,-.063),V(length+.01,.115,width),color,rotation,{collider:false,tag});
       for(const sign of [-1,1])block(center.clone().addScaledVector(up,.10).addScaledVector(side,sign*(width/2-.032)),V(length+.01,wall,.065),color,rotation,{collider:false,tag});
-      // Shared boundary vertices at every spline node make the floor and walls continuous.
       quad(a.left,a.right,b.left,b.right);
       quad(a.left,b.left,a.left.clone().addScaledVector(a.up,wall),b.left.clone().addScaledVector(b.up,wall));
       quad(a.right,a.right.clone().addScaledVector(a.up,wall),b.right,b.right.clone().addScaledVector(b.up,wall));
     }
-    const strip=RAPIER.ColliderDesc.trimesh(new Float32Array(vertices),new Uint32Array(indices)).setFriction(friction).setRestitution(.08);
-    staticColliders.push(world.createCollider(strip));
+    staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(vertices),new Uint32Array(indices)).setFriction(friction).setRestitution(.08)));
   }
   railPath([[-6.78,7.49,-.88],[-6.05,7.30,-.88],[-4.45,6.86,-.88]],PALETTE.coral,{width:.56,friction:.29,tag:'lift-exit'});
-  // The first tangent is aligned with the preceding descent; lateral changes begin gradually.
   const bend=sampleSpline([[-4.45,6.86,-.88],[-3.70,6.65,-.88],[-2.60,6.25,-.37],[-1.15,5.81,-1.29],[.09,5.36,-.41],[1.42,4.94,-.88]],40);
-  railPath(bend,PALETTE.cyan,{width:.65,friction:.25,tag:'s-bend'});
-  const n=56,k=8,verts=[],faces=[];
-  for(let j=0;j<=k;j++){const r=FUNNEL.inner+(FUNNEL.outer-FUNNEL.inner)*j/k;for(let i=0;i<=n;i++){const a=i/n*Math.PI*2;verts.push(FUNNEL.x+r*Math.cos(a),FUNNEL.y+(r-FUNNEL.inner)*.58,FUNNEL.z+r*Math.sin(a))}}
+  railPath(bend,PALETTE.cyan,{width:.65,friction:.20,tag:'s-bend'});
+  // Open, single continuous annular collider. No invisible force, position snap, or hole-covering disc.
+  const n=64,k=12,verts=[],faces=[];
+  for(let j=0;j<=k;j++){const r=FUNNEL.inner+(FUNNEL.outer-FUNNEL.inner)*j/k;for(let i=0;i<=n;i++){const a=i/n*Math.PI*2;verts.push(FUNNEL.x+r*Math.cos(a),FUNNEL.y+(r-FUNNEL.inner)*.67,FUNNEL.z+r*Math.sin(a))}}
   for(let j=0;j<k;j++)for(let i=0;i<n;i++){const a=j*(n+1)+i,b=(j+1)*(n+1)+i,c=a+1,d=b+1;faces.push(a,c,b,c,d,b)}
   const funnelGeometry=new THREE.BufferGeometry();funnelGeometry.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));funnelGeometry.setIndex(faces);funnelGeometry.computeVertexNormals();
   scene.add(new THREE.Mesh(funnelGeometry,new THREE.MeshStandardMaterial({color:PALETTE.yellow,roughness:.29,metalness:.05,side:THREE.DoubleSide})));
-  staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(verts),new Uint32Array(faces)).setFriction(.23)));
+  staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(verts),new Uint32Array(faces)).setFriction(.12)));
   pieces.push({kind:'funnel',radius:FUNNEL.outer,hole:FUNNEL.inner,tag:'vortex'});
-  railPath(sampleSpline([[2.6,3.50,-.88],[2.6,3.12,-.88],[1.68,3.01,-.88],[.05,2.83,-.88],[-2.7,2.42,-.88],[-4.87,2.50,-.88],[-3.62,1.54,-.88]],40),PALETTE.violet,{width:.56,tag:'post-funnel'});
+  // Catcher is BELOW the open throat. Its shallow slope carries balls to the side exit.
+  // The old chute began with a perfectly vertical rail, whose tangent x UP was zero.
+  block([2.51,3.13,-.88],[1.12,.15,1.12],PALETTE.violet,undefined,{tag:'vortex-catch-floor',friction:.15});
+  for(const z of [-1.45,-.31])block([2.51,3.36,z],[1.18,.43,.07],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
+  block([3.08,3.36,-.88],[.07,.43,1.15],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
+  railPath(sampleSpline([[2.26,3.17,-.88],[1.68,3.01,-.88],[.05,2.83,-.88],[-2.7,2.42,-.88],[-4.87,2.50,-.88],[-3.62,1.54,-.88]],40),PALETTE.violet,{width:.72,friction:.19,tag:'post-funnel'});
   railPath([[-3.62,1.54,-.88],[LOOP.x,LOOP.y-LOOP.radius,-.88]],PALETTE.coral,{width:.47,friction:.16,tag:'loop-entry'});
   const loop=[];for(let i=0;i<=64;i++){const a=i/64*Math.PI*2;loop.push([LOOP.x+LOOP.radius*Math.sin(a),LOOP.y-LOOP.radius*Math.cos(a),LOOP.z])}
   railPath(loop,PALETTE.coral,{width:.48,wall:.31,friction:.13,tag:'gravity-loop'});
