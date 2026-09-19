@@ -25,6 +25,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Syntax and physical-continuity tests
         run: npm run check
+      - name: Measure headless Rapier CPU baseline (not iPhone GPU or browser benchmark)
+        run: npm run bench:physics
       - name: Bundle into a standalone static website
         run: npm run build
       - name: Verify deployed entry point and bundled assets
