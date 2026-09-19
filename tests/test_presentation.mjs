@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const main=readFileSync(new URL('../site/3d/main.js',import.meta.url),'utf8');
+const html=readFileSync(new URL('../site/3d/index.html',import.meta.url),'utf8');
+assert.match(main,/sim\.options\.particles\s*=\s*false\s*;/,'default presentation must disable decorative particle simulation');
+assert.match(main,/sim\.options\.spray\s*=\s*0\s*;/,'default presentation must disable decorative spray emitter');
+assert.match(main,/\$\('spray'\)\.hidden\s*=\s*true/,'hide decorative spray setting');
+assert.match(main,/\$\('particles'\)\.closest\('label'\)\.hidden\s*=\s*true/,'hide obsolete fountain setting');
+assert.match(html,/<script type="module" src="\.\/main\.js"><\/script>/,'3D entry point must load updated main module');
+console.log('PASS 3D default presentation removes decorative fountain and splash work');
