@@ -5,11 +5,11 @@
  * See https://doi.org/10.1119/1.4747481 and UW-Madison Gravity Pit exhibit.
  */
 export const VORTEX_PROFILE=Object.freeze({
-  inner:.49,outer:1.36,throatY:3.74,rimY:4.99,
-  // Entry at the back of the bowl: the rail approaches tangentially in +X.
-  inletAngle:-1.771, inletHalfAngle:.34,
-  guardHeight:.51,guardRadius:1.395,
-  radialSegments:24,angularSegments:128
+  inner:.49,outer:1.55,throatY:3.74,rimY:4.99,
+  // The approach enters at the rear of the bowl; the rail arrives near +X.
+  inletAngle:-1.771,inletHalfAngle:.34,
+  guardHeight:.51,guardRadius:1.585,
+  radialSegments:30,angularSegments:128
 });
 const TAU=Math.PI*2;
 export function vortexHeight(r,p=VORTEX_PROFILE){
