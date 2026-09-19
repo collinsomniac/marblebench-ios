@@ -1,0 +1,39 @@
+name: Modular Garden physical and build verification
+on:
+  push:
+    branches:
+      - feature/modular-garden-v2
+  pull_request:
+    paths:
+      - 'experiments/modular-garden/**'
+      - '.github/workflows/modular-garden-ci.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: experiments/modular-garden
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned engine dependencies
+        run: npm install --no-audit --no-fund
+      - name: Syntax and physical-continuity tests
+        run: npm run check
+      - name: Bundle into a standalone static website
+        run: npm run build
+      - name: Verify deployed entry point and bundled assets
+        run: |
+          test -s dist/index.html
+          test -d dist/assets
+          grep -q 'MarbleBench' dist/index.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modular-garden-website
+          path: experiments/modular-garden/dist
+          retention-days: 7
