@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+export const FOLLOW_FOV_MULTIPLIER = 1.25;
 const temp = new THREE.Vector3();
 const point = new THREE.Vector3();
 const direction = new THREE.Vector3(1, 0, 0);
@@ -11,6 +12,7 @@ const right = new THREE.Vector3();
 export class CameraRig {
   constructor(camera, canvas, movementPad, movementThumb) {
     this.camera = camera;
+    this.baseFov = camera.fov;
     this.canvas = canvas;
     this.pad = movementPad;
     this.thumb = movementThumb;
@@ -21,7 +23,7 @@ export class CameraRig {
     this.yaw = 0.12;
     this.pitch = 0.22;
     this.distance = 21;
-    this.followDistance = 2.25;
+    this.followDistance = 2.85;
     this.lookYaw = 0;
     this.lookPitch = 0;
     this.move = { x: 0, y: 0 };
@@ -43,6 +45,11 @@ export class CameraRig {
     }
     if (mode === 'third' || mode === 'first') this.focusId = balls.find(b => b.id === this.focusId)?.id ?? balls[0].id;
     this.mode = mode;
+    // Change projection with mode, not every frame. This is a 25% increase in
+    // VERTICAL FOV (47° -> 58.75°); horizontal FOV also widens at fixed aspect.
+    const follow = mode === 'first' || mode === 'third';
+    this.camera.fov = follow ? Math.min(105, this.baseFov * FOLLOW_FOV_MULTIPLIER) : this.baseFov;
+    this.camera.updateProjectionMatrix();
     this.lookYaw = 0;
     this.lookPitch = 0;
     this.pad.hidden = mode !== 'explore';
@@ -60,7 +67,6 @@ export class CameraRig {
   }
   bind() {
     const canvas = this.canvas;
-    // The canvas owns camera gestures. Settings and document UI keep native scrolling.
     canvas.style.touchAction = 'none';
     canvas.addEventListener('pointerdown', e => {
       if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 2) return;
@@ -78,9 +84,8 @@ export class CameraRig {
         if (this.lastPinch) {
           const ratio = clamp(this.lastPinch / Math.max(pinch, 1), 0.85, 1.15);
           if (this.mode === 'orbit') this.distance = clamp(this.distance * ratio, 4, 38);
-          else if (this.mode === 'third') this.followDistance = clamp(this.followDistance * ratio, 0.9, 6);
+          else if (this.mode === 'third') this.followDistance = clamp(this.followDistance * ratio, 1.2, 7);
         }
-        // Two-finger movement pans orbit focus in the camera's horizontal plane.
         if (this.mode === 'orbit') {
           const dx = (e.clientX - old.x) * this.distance * 0.0014;
           const dy = (e.clientY - old.y) * this.distance * 0.0014;
@@ -108,7 +113,7 @@ export class CameraRig {
       if (this.mode === 'orbit' || this.mode === 'third') {
         e.preventDefault();
         const key = this.mode === 'orbit' ? 'distance' : 'followDistance';
-        this[key] = clamp(this[key] * Math.exp(e.deltaY * 0.001), key === 'distance' ? 4 : 0.9, key === 'distance' ? 38 : 6);
+        this[key] = clamp(this[key] * Math.exp(e.deltaY * 0.001), key === 'distance' ? 4 : 1.2, key === 'distance' ? 38 : 7);
       }
     }, { passive: false });
     this.pad.style.touchAction = 'none';
@@ -183,13 +188,12 @@ export class CameraRig {
     forward.set(Math.sin(heading) * Math.cos(inclination), Math.sin(inclination), Math.cos(heading) * Math.cos(inclination));
     if (this.mode === 'third') {
       wanted.copy(point).addScaledVector(forward, -this.followDistance);
-      wanted.y += Math.max(0.5, this.followDistance * 0.36);
+      wanted.y += Math.max(0.65, this.followDistance * 0.36);
       this.camera.position.lerp(wanted, blend);
-      this.camera.lookAt(point.x + forward.x * 0.35, point.y + 0.1 + forward.y * 0.35, point.z + forward.z * 0.35);
+      this.camera.lookAt(point.x + forward.x * 0.65, point.y + 0.16 + forward.y * 0.65, point.z + forward.z * 0.65);
     } else {
-      // The optical viewpoint sits just ahead of the sphere's surface, not inside its mesh.
       wanted.copy(point).addScaledVector(forward, ball.radius * 1.3);
-      wanted.y += ball.radius * 0.25;
+      wanted.y += ball.radius * 0.5;
       this.camera.position.lerp(wanted, blend);
       this.camera.lookAt(wanted.x + forward.x * 3, wanted.y + forward.y * 3, wanted.z + forward.z * 3);
     }
