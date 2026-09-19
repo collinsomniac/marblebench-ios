@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {buildCourse,POOL,LIFT,MARBLE_RADIUS,liftHeight,liftGateOpening} from './course.js';
 import {installReturnGuard} from './return-guard.js';
+import {installOverflowCatcher} from './overflow-catcher.js';
 
 export const FIXED_DT=1/120;
 export const DENSITY=Object.freeze({water:1000,lightMarble:720,solidGlass:2500});
@@ -19,7 +20,8 @@ export class GardenSimulation {
     this.R=RAPIER;this.world=new RAPIER.World({x:0,y:-9.81,z:0});this.world.timestep=FIXED_DT;
     this.scene=scene;this.course=buildCourse({RAPIER,world:this.world,scene});
     this.returnGuard=installReturnGuard(RAPIER,this.world,scene);
-    this.course.pieces.push({kind:'bumper',tag:'physical-return-bumper'});
+    this.overflowCatcher=installOverflowCatcher(RAPIER,this.world,scene);
+    this.course.pieces.push({kind:'bumper',tag:'physical-return-bumper'},{kind:'catcher',tag:'physical-wide-water-outflow'});
     this.balls=[];this.sequence=0;this.time=0;this.spawnAccumulator=0;this.losses=0;this.waterImpacts=0;
     this.stats={contacts:'engine-managed',steps:0};this.options={flow:.48,capacity:48,speed:1,water:true,gravity:9.81};
     this.sphereGeometry=new THREE.SphereGeometry(MARBLE_RADIUS,24,16);
@@ -78,8 +80,10 @@ export class GardenSimulation {
       // Rapier addForce is persistent; recompute fluid and conveyor forces on each tick.
       b.body.resetForces(false);
       const p=b.body.translation(),v=b.body.linvel();b.previous.x=p.x;b.previous.y=p.y;b.previous.z=p.z;
-      if(p.y<.05&&p.y>-.87&&p.x>-7.60&&p.x<7.5&&Math.abs(p.z-LIFT.z)<.48){
-        b.body.addForce({x:mass*clamp((-1.9-v.x)*2.6,-8,8),y:0,z:mass*clamp((LIFT.z-p.z)*2,-2,2)},true);
+      // The physical lower collection tray is wide. Motor force gradually centers marbles
+      // while conveying them toward the lift; it never relocates their coordinates.
+      if(p.y<.20&&p.y>-1.15&&p.x>-7.60&&p.x<7.66&&Math.abs(p.z-LIFT.z)<1.63){
+        b.body.addForce({x:mass*clamp((-1.9-v.x)*2.6,-8,8),y:0,z:mass*clamp((LIFT.z-p.z)*2.6,-3.5,3.5)},true);
       }
       this.applyBuoyancy(b);
     }
@@ -102,5 +106,5 @@ export class GardenSimulation {
     this.mesh.instanceMatrix.needsUpdate=true;if(this.mesh.instanceColor)this.mesh.instanceColor.needsUpdate=true;
   }
   snapshot(){return {balls:this.balls.length,steps:this.stats.steps,losses:this.losses,waterImpacts:this.waterImpacts,activeLiftHeight:liftHeight(this.time)};}
-  dispose(){for(let i=this.balls.length-1;i>=0;i--)this.removeBall(i);this.mesh.geometry.dispose();this.marbleMaterial.dispose();this.returnGuard.mesh.geometry.dispose();this.returnGuard.mesh.material.dispose();}
+  dispose(){for(let i=this.balls.length-1;i>=0;i--)this.removeBall(i);this.mesh.geometry.dispose();this.marbleMaterial.dispose();this.returnGuard.mesh.geometry.dispose();this.returnGuard.mesh.material.dispose();this.overflowCatcher.dispose();}
 }
