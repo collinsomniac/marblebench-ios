@@ -6,7 +6,8 @@
   "scripts": {
     "build": "vite build --base=/marblebench-ios/modular/",
     "dev": "vite --host 0.0.0.0",
-    "check": "node --check src/main.js && node --check src/course.js && node --check src/physics.js && node --check src/camera.js && node --test tests/*.test.js"
+    "check": "node --check src/main.js && node --check src/course.js && node --check src/route-geometry.js && node --check src/physics.js && node --check src/camera.js && node --test tests/*.test.js",
+    "bench:physics": "node benchmarks/physics.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.20.0",
