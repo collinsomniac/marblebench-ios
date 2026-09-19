@@ -18,16 +18,21 @@ export function loopCenterline(loop,options=LOOP_CLEARANCE){
  }
  return points;
 }
-/** Mirror the course's continuous rail triangulation for an isolated collider
- * comparison. Every strip is one indexed triangle mesh, not a chain of boxes.
+/** One continuous collider strip. The old frame used tangent × world-up;
+ * it FLIPPED the cross-section around vertical tangents, producing twisted
+ * walls and incorrect contact normals at the top of a vertical loop.
+ * Instead project a stable depth-axis binormal perpendicular to each tangent.
+ * For this predominantly XY-loop it stays nondegenerate, preserving an inward
+ * surface normal through all four quadrants and the smooth return detour.
  */
 export function loopColliderGeometry(points,{width=.48,wall=.31}={}){
- const up=new THREE.Vector3(0,1,0),path=points.map(p=>new THREE.Vector3(...p));
+ const depthAxis=new THREE.Vector3(0,0,1),path=points.map(p=>new THREE.Vector3(...p));
  const sections=path.map((p,i)=>{
   const a=path[Math.max(0,i-1)],b=path[Math.min(path.length-1,i+1)];
   const tangent=b.clone().sub(a).normalize();
-  const side=new THREE.Vector3().crossVectors(tangent,up);
-  if(side.lengthSq()<1e-8)side.set(0,0,1);else side.normalize();
+  const side=depthAxis.clone().addScaledVector(tangent,-depthAxis.dot(tangent));
+  if(side.lengthSq()<1e-7)throw Error('Loop path approaches the reference depth axis: use a transported frame');
+  side.normalize();
   const normal=new THREE.Vector3().crossVectors(side,tangent).normalize();
   return {left:p.clone().addScaledVector(side,-width/2),right:p.clone().addScaledVector(side,width/2),normal};
  });
