@@ -1,21 +1,16 @@
 import * as THREE from 'three';
-import {buildCourse,POOL,LIFT,MARBLE_RADIUS,liftHeight,liftGateOpening} from './course.js';
+import {buildCourse,POOL,LIFT,MARBLE_RADIUS,liftGateOpening} from './course.js';
+import {steppedLiftHeight,ratchetStage} from './ratchet.js';
 import {installReturnGuard} from './return-guard.js';
 import {installOverflowCatcher} from './overflow-catcher.js';
 
 export const FIXED_DT=1/120;
 export const DENSITY=Object.freeze({water:1000,lightMarble:720,solidGlass:2500});
 const PI=Math.PI,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-const volume=4/3*PI*MARBLE_RADIUS**3;
-const mass=volume*.72;
-export function initialPosition(i=0){
-  const lane=Math.min(5,Math.max(0,i));
-  const x=-6.45+lane*.36;
-  const trackHeight=7.49-(x+6.78)*(.63/2.33);
-  return {x,y:trackHeight+MARBLE_RADIUS+.045,z:-.88};
-}
-/** All existing marbles move through Rapier; replacement always gets a new entity ID. */
-export class GardenSimulation {
+const volume=4/3*PI*MARBLE_RADIUS**3,mass=volume*.72;
+export function initialPosition(i=0){const lane=Math.min(5,Math.max(0,i)),x=-6.45+lane*.36;const trackHeight=7.49-(x+6.78)*(.63/2.33);return{x,y:trackHeight+MARBLE_RADIUS+.045,z:-.88};}
+/** Existing marbles move only through Rapier; replacements receive new entity IDs. */
+export class GardenSimulation{
   constructor(RAPIER,scene){
     this.R=RAPIER;this.world=new RAPIER.World({x:0,y:-9.81,z:0});this.world.timestep=FIXED_DT;
     this.scene=scene;this.course=buildCourse({RAPIER,world:this.world,scene});
@@ -61,7 +56,7 @@ export class GardenSimulation {
   }
   addMarbles(n=1){let added=0;for(let i=0;i<n;i++){const position=initialPosition((this.sequence+i)%6);position.y+=Math.floor(i/6)*.37;if(!this.spawn(position))break;added++;}return added;}
   removeBall(index,lost=false){const b=this.balls[index];this.world.removeRigidBody(b.body);this.balls.splice(index,1);if(lost)this.losses++;}
-  /** Exact spherical-cap displacement for flat water; current and drag are approximations. */
+  /** Exact spherical-cap displacement on a flat surface; flow and drag remain approximations. */
   applyBuoyancy(ball){
     if(!this.options.water){ball.inWater=false;return;}
     const p=ball.body.translation(),r=ball.radius;
@@ -74,14 +69,12 @@ export class GardenSimulation {
   }
   step(){
     const dt=FIXED_DT;this.time+=dt;
-    const y=liftHeight(this.time);this.shelf.setNextKinematicTranslation({x:LIFT.x,y,z:LIFT.z});
+    const y=steppedLiftHeight(this.time);this.shelf.setNextKinematicTranslation({x:LIFT.x,y,z:LIFT.z});
     const open=liftGateOpening(this.time);this.gate.setNextKinematicTranslation({x:LIFT.x+.55,y:y+.22,z:LIFT.z-open*.95});
     for(const b of this.balls){
-      // Rapier addForce is persistent; recompute fluid and conveyor forces on each tick.
+      // Rapier addForce persists: clear and recalculate current and conveyor forces every tick.
       b.body.resetForces(false);
       const p=b.body.translation(),v=b.body.linvel();b.previous.x=p.x;b.previous.y=p.y;b.previous.z=p.z;
-      // The physical lower collection tray is wide. Motor force gradually centers marbles
-      // while conveying them toward the lift; it never relocates their coordinates.
       if(p.y<.20&&p.y>-1.15&&p.x>-7.60&&p.x<7.66&&Math.abs(p.z-LIFT.z)<1.63){
         b.body.addForce({x:mass*clamp((-1.9-v.x)*2.6,-8,8),y:0,z:mass*clamp((LIFT.z-p.z)*2.6,-3.5,3.5)},true);
       }
@@ -105,6 +98,6 @@ export class GardenSimulation {
     }
     this.mesh.instanceMatrix.needsUpdate=true;if(this.mesh.instanceColor)this.mesh.instanceColor.needsUpdate=true;
   }
-  snapshot(){return {balls:this.balls.length,steps:this.stats.steps,losses:this.losses,waterImpacts:this.waterImpacts,activeLiftHeight:liftHeight(this.time)};}
+  snapshot(){return{balls:this.balls.length,steps:this.stats.steps,losses:this.losses,waterImpacts:this.waterImpacts,activeLiftHeight:steppedLiftHeight(this.time),ratchet:ratchetStage(this.time)};}
   dispose(){for(let i=this.balls.length-1;i>=0;i--)this.removeBall(i);this.mesh.geometry.dispose();this.marbleMaterial.dispose();this.returnGuard.mesh.geometry.dispose();this.returnGuard.mesh.material.dispose();this.overflowCatcher.dispose();}
 }
