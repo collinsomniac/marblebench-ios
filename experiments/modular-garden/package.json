@@ -1,0 +1,18 @@
+{
+  "name": "marblebench-modular-garden",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build --base=/marblebench-ios/modular/",
+    "dev": "vite --host 0.0.0.0",
+    "check": "node --check src/main.js && node --check src/course.js && node --check src/physics.js && node --check src/camera.js && node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "0.20.0",
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "vite": "7.1.0"
+  }
+}
