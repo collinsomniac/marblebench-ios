@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import {POST_FUNNEL_WAYPOINTS} from './route-geometry.js';
+import {VORTEX_PROFILE,createVortexGeometry} from './vortex-profile.js';
 
 export const MARBLE_RADIUS=0.17;
 export const POOL=Object.freeze({minX:3.1,maxX:6.4,minZ:-1.8,maxZ:.42,floor:.14,level:.86});
 export const LIFT=Object.freeze({x:-7.25,z:-.88,bottom:-.54,top:7.48,rise:15,bottomDwell:2.8,topDwell:1.7,return:3});
 export const LOOP=Object.freeze({x:-2.57,y:2.23,z:-.88,radius:.70});
-// A marble is 0.34 wide; the previous 0.52-wide exit trapped spheres at its lip.
-// A 0.98-wide exit provides clearance for one moving marble plus off-axis motion.
-export const FUNNEL=Object.freeze({x:2.60,y:4.04,z:-.88,inner:.49,outer:1.36});
+// Physical funnel: a rotationally symmetric hyperbolic-like bowl. No spiral
+// groove or prescribed velocity; the entry rail supplies tangential momentum.
+export const FUNNEL=Object.freeze({x:2.60,z:-.88,y:VORTEX_PROFILE.throatY,inner:VORTEX_PROFILE.inner,outer:VORTEX_PROFILE.outer,rimY:VORTEX_PROFILE.rimY});
 export const COURSE_LABELS=Object.freeze(['Motorized ratchet lift','S-bend','Open vortex','Gravity loop','Spring trampoline','Floating moat','Return conveyor']);
 export const PALETTE=Object.freeze({cyan:0x40c8d4,yellow:0xffd351,coral:0xff7058,violet:0x9c7be8,teal:0x29b3a4,mint:0x76dcbd,dark:0x263c51,cream:0xece8d9,brass:0xc69c57});
 const V=(x,y,z)=>new THREE.Vector3(x,y,z),UP=V(0,1,0),boxGeometry=new THREE.BoxGeometry(1,1,1);
@@ -19,6 +20,7 @@ export function liftGateOpening(t){const {rise,bottomDwell,topDwell,return:back}
 
 export function buildCourse({RAPIER,world,scene}){
   const instances=new Map(),pieces=[],staticColliders=[];
+  const internalEdges=RAPIER.TriMeshFlags?.FIX_INTERNAL_EDGES??0;
   function collider(center,size,rotation,options={}){const desc=RAPIER.ColliderDesc.cuboid(size.x/2,size.y/2,size.z/2).setTranslation(center.x,center.y,center.z).setRotation(rotation).setFriction(options.friction??.48).setRestitution(options.restitution??.08);staticColliders.push(world.createCollider(desc))}
   function block(center,size,color,rotation=new THREE.Quaternion(),options={}){
     const c=Array.isArray(center)?V(...center):center,s=Array.isArray(size)?V(...size):size;
@@ -39,7 +41,7 @@ export function buildCourse({RAPIER,world,scene}){
     const vertices=[],indices=[];
     function quad(a,b,c,d){const base=vertices.length/3;for(const p of [a,b,c,d])vertices.push(p.x,p.y,p.z);indices.push(base,base+1,base+2,base+1,base+3,base+2)}
     for(let i=1;i<sections.length;i++){
-      const a=sections[i-1],b=sections[i];const center=a.p.clone().add(b.p).multiplyScalar(.5);
+      const a=sections[i-1],b=sections[i],center=a.p.clone().add(b.p).multiplyScalar(.5);
       const t=b.p.clone().sub(a.p),length=t.length();if(length<.001)continue;t.normalize();
       let side=new THREE.Vector3().crossVectors(t,UP);
       if(side.lengthSq()<1e-8)side.set(0,0,1);else side.normalize();
@@ -51,24 +53,25 @@ export function buildCourse({RAPIER,world,scene}){
       quad(a.left,b.left,a.left.clone().addScaledVector(a.up,wall),b.left.clone().addScaledVector(b.up,wall));
       quad(a.right,a.right.clone().addScaledVector(a.up,wall),b.right,b.right.clone().addScaledVector(b.up,wall));
     }
-    staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(vertices),new Uint32Array(indices)).setFriction(friction).setRestitution(.08)));
+    staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(vertices),new Uint32Array(indices),internalEdges).setFriction(friction).setRestitution(.08)));
   }
   railPath([[-6.78,7.49,-.88],[-6.05,7.30,-.88],[-4.45,6.86,-.88]],PALETTE.coral,{width:.56,friction:.29,tag:'lift-exit'});
-  const bend=sampleSpline([[-4.45,6.86,-.88],[-3.70,6.65,-.88],[-2.60,6.25,-.37],[-1.15,5.81,-1.29],[.09,5.36,-.41],[1.42,4.94,-.88]],40);
+  // Entry is almost tangent to the rear edge of the bowl; it does not aim at
+  // the hole. The marble is free to orbit in either direction after collisions.
+  const bend=sampleSpline([[-4.45,6.86,-.88],[-3.70,6.65,-.88],[-2.60,6.25,-.37],[-1.15,5.81,-1.29],[.09,5.36,-.41],[.75,5.20,-1.26],[1.20,5.09,-1.78],[1.72,5.00,-2.13],[2.33,4.97,-2.21]],56);
   railPath(bend,PALETTE.cyan,{width:.65,friction:.20,tag:'s-bend'});
-  // Open, single continuous annular collider. No invisible force, position snap, or hole-covering disc.
-  const n=64,k=12,verts=[],faces=[];
-  for(let j=0;j<=k;j++){const r=FUNNEL.inner+(FUNNEL.outer-FUNNEL.inner)*j/k;for(let i=0;i<=n;i++){const a=i/n*Math.PI*2;verts.push(FUNNEL.x+r*Math.cos(a),FUNNEL.y+(r-FUNNEL.inner)*.67,FUNNEL.z+r*Math.sin(a))}}
-  for(let j=0;j<k;j++)for(let i=0;i<n;i++){const a=j*(n+1)+i,b=(j+1)*(n+1)+i,c=a+1,d=b+1;faces.push(a,c,b,c,d,b)}
-  const funnelGeometry=new THREE.BufferGeometry();funnelGeometry.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));funnelGeometry.setIndex(faces);funnelGeometry.computeVertexNormals();
+  // Share the exact same indexed mesh between visual geometry and collision.
+  // A tall outer lip has a real gap for the tangential inlet; the center is open.
+  const well=createVortexGeometry(FUNNEL);
+  const funnelGeometry=new THREE.BufferGeometry();funnelGeometry.setAttribute('position',new THREE.BufferAttribute(well.vertices,3));funnelGeometry.setIndex(new THREE.BufferAttribute(well.indices,1));funnelGeometry.computeVertexNormals();
   scene.add(new THREE.Mesh(funnelGeometry,new THREE.MeshStandardMaterial({color:PALETTE.yellow,roughness:.29,metalness:.05,side:THREE.DoubleSide})));
-  staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(new Float32Array(verts),new Uint32Array(faces)).setFriction(.12)));
+  staticColliders.push(world.createCollider(RAPIER.ColliderDesc.trimesh(well.vertices,well.indices,internalEdges).setFriction(.12).setRestitution(.035)));
   pieces.push({kind:'funnel',radius:FUNNEL.outer,hole:FUNNEL.inner,tag:'vortex'});
-  // Catcher is BELOW the open throat; the downhill path takes a wide U-turn
-  // in depth rather than crossing the loop or gaining height before its entry.
-  block([2.51,3.13,-.88],[1.12,.15,1.12],PALETTE.violet,undefined,{tag:'vortex-catch-floor',friction:.15});
-  for(const z of [-1.45,-.31])block([2.51,3.36,z],[1.18,.43,.07],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
-  block([3.08,3.36,-.88],[.07,.43,1.15],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
+  // A deep, largely enclosed physical collector catches marbles without
+  // teleporting them; its west face opens directly onto the post-funnel rail.
+  block([2.51,3.13,-.88],[1.12,.15,1.12],PALETTE.violet,undefined,{tag:'vortex-catch-floor',friction:.15,restitution:.025});
+  for(const z of [-1.51,-.25])block([2.51,3.37,z],[1.25,1.12,.09],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
+  block([3.12,3.37,-.88],[.09,1.12,1.33],PALETTE.violet,undefined,{tag:'vortex-catch-wall'});
   railPath(sampleSpline(POST_FUNNEL_WAYPOINTS,64),PALETTE.violet,{width:.72,friction:.19,tag:'post-funnel-overpass'});
   railPath([[-3.62,1.54,-.88],[LOOP.x,LOOP.y-LOOP.radius,LOOP.z]],PALETTE.coral,{width:.47,friction:.16,tag:'loop-entry'});
   const loop=[];for(let i=0;i<=64;i++){const a=i/64*Math.PI*2;loop.push([LOOP.x+LOOP.radius*Math.sin(a),LOOP.y-LOOP.radius*Math.cos(a),LOOP.z])}
