@@ -93,6 +93,9 @@ export class GardenSimulation {
     const open=liftGateOpening(this.time);
     this.gate.setNextKinematicTranslation({x:LIFT.x+.55,y:y+.22,z:LIFT.z-open*.95});
     for(const b of this.balls){
+      // Rapier addForce persists until resetForces; recompute conveyor and fluid forces each step.
+      // Reset without waking sleeping marbles, then wake only when an actual force is applied.
+      b.body.resetForces(false);
       const p=b.body.translation(),v=b.body.linvel();b.previous.x=p.x;b.previous.y=p.y;b.previous.z=p.z;
       if(p.y<.05&&p.y>-.87&&p.x>-7.60&&p.x<7.5&&Math.abs(p.z-LIFT.z)<.48){
         b.body.addForce({x:mass*clamp((-1.9-v.x)*2.6,-8,8),y:0,z:mass*clamp((LIFT.z-p.z)*2,-2,2)},true);
