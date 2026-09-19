@@ -1,49 +1,49 @@
 # MarbleBench Modular Garden — experimental v0.1
 
-**This is a physical-simulation experiment, not a completed continuous marble machine or a validated iPhone benchmark.** Existing `/` and `/3d/` remain preserved. The experimental preview is deployed through the authorized `main` GitHub Pages workflow, which checks out this separate feature branch and builds it without merging source into `main`.
+**This is a physical-simulation experiment, not a completed continuous marble machine or a validated iPhone benchmark.** Existing `/` and `/3d/` remain preserved. The separate experimental preview is deployed through the authorized `main` GitHub Pages workflow, which checks out this feature branch without merging experimental source into `main`.
 
 [Open the modular preview](https://collinsomniac.github.io/marblebench-ios/modular/) · [Physical/CI results](https://github.com/collinsomniac/marblebench-ios/actions/workflows/modular-garden-ci.yml) · [Source](https://github.com/collinsomniac/marblebench-ios/tree/feature/modular-garden-v2/experiments/modular-garden)
 
-The preview does not update automatically after every feature-branch push: rerun the `main` Pages workflow to rebuild this experimental subpath. The feature branch's earlier Pages deployment workflow was removed after GitHub rejected it before any steps ran.
+The preview does not update automatically after every feature-branch push: the `main` Pages workflow must run to publish a fresh bundle. Do not rerun the same Pages *job* after an artifact has been uploaded; a duplicate `github-pages` artifact caused a deployment failure previously. Start a new workflow run instead.
 
-## Local development
+## Local development and diagnostics
 
 ```sh
 cd experiments/modular-garden
 npm install
 npm run check
+npm run bench:physics
 npm run dev
 npm run build
 ```
 
-Vite uses base `/marblebench-ios/modular/` in the production bundle. `npm install` is currently used rather than `npm ci`; committing a lockfile is an outstanding reproducibility improvement.
+The production Vite base is `/marblebench-ios/modular/`. `npm install` is currently used rather than `npm ci`; committing a lockfile remains a reproducibility improvement. The optional benchmark reports Node/Rapier **headless CPU** step p50/p95 across three marble-flow conditions. It does not execute Three.js rendering, Safari, WebGPU, WebGL, or Metal; its RSS is a non-isolated process snapshot. GitHub CI records this benchmark without imposing hardware-dependent timing thresholds.
 
 ## Controls and accessibility
 
-- **Orbit**: swipe on canvas to rotate the viewpoint, two-finger pan and pinch to zoom. Settings panel uses `touch-action: pan-y` and retains native scrolling. Only the canvas and explore movement pad capture camera gestures.
-- **Explore**: joystick at lower left translates the viewpoint; swipes on the canvas turn/look. No navigation mesh or collision-aware camera yet.
-- **3rd Person**: damped following camera behind selected marble, oriented from its physical velocity; **1st Person**: camera offset slightly ahead of its surface in its travel direction.
-- **Next ball** cycles stable marble entity IDs. Lost marbles are removed and replacements spawn as new entities, never instantaneously relocated mid-course.
-- **Renderer**: Three.js `WebGPURenderer`, auto WebGPU/WebGL 2 fallback or explicitly forced WebGL 2, one canvas per run. Switching backend reloads the scene; real backend identity, quality and timings require verification on the physical iPhone.
+- **Orbit**: canvas swipe rotates, two-finger pan and pinch zoom. The settings panel uses `touch-action: pan-y` and native scrolling. Only canvas and explore movement pad capture camera gestures.
+- **Explore**: lower-left joystick translates, canvas swipes look around; no navigation mesh or collision-aware camera yet.
+- **Third Person / First Person**: velocity-directed follow cameras now use **58.75° vertical FOV instead of 47°**, a 25% increase. Third Person follows at an initial 2.85 metres, with adjustable distance. Orbit and Explore retain 47°.
+- **Next ball** cycles stable IDs. Lost bodies are removed; replacement spheres spawn as new IDs, never instantaneously relocated between course modules.
+- **Simulation pace** starts at **1.15×** as a reversible presentation preference. Set Tune → Simulation speed to 1.00× for physically comparable timing. Rapier still integrates at fixed 120 Hz in simulated time. Advancing simulation faster may require additional CPU steps per real second; it is not a performance optimization.
+- **Renderer**: Three.js `WebGPURenderer`, auto WebGPU/WebGL 2 fallback or explicitly forced WebGL 2, one canvas per run. Switching backends reloads the scene. Actual backend, quality, timing and thermal behavior require measurement on the physical iPhone.
 
-## Physics and course
+## Physical design and verified corrections
 
-Rapier WASM supplies CCD spheres, continuous rail trimeshes without box-segment endcaps, a funnel with an actual opening, loop geometry, and a dynamic spring-jointed trampoline. A powered kinematic shelf follows **twelve smoothly eased upward motor steps with dwell periods**; its motor supplies energy while Rapier manages the marble contacts. The step timing is verified independently, but the elevator has not yet been shown to pick up a marble and return it to the top. A physical full-width pool catcher, impact bumper, and force-driven conveyor form a lower return. The pool remains a flat transparent sheet plus analytic displaced-volume buoyancy and approximate drag/current—**not** a 3D fluid solver.
+Rapier WASM supplies CCD spheres, continuous rail trimeshes, an annular funnel opening, loop geometry, and a dynamic spring-jointed trampoline. A powered shelf follows twelve eased upward motor steps with dwell periods; elevator **motion** is verified but marble pickup and recirculation are not. A full-width lower catcher, impact bumper and force-driven conveyor provide a return region. The pool remains a flat transparent surface plus analytic displaced-volume buoyancy and approximate drag/current—**not** a fluid solver.
 
-Rapier `addForce()` persists until cleared, so the motor and water forces are recomputed after `resetForces(false)` each fixed step. This resolved an earlier runaway-energy bug. Source: https://rapier.rs/docs/user_guides/javascript/rigid_body_forces_and_impulses/ .
+The original funnel's outlet was only 1.53 marble diameters across. In a 60-second test it produced four observed exits from 32 entrants, peak occupancy 28, and median residence 25.7 seconds. Widening the actual outlet to 2.88 marble diameters and correcting the physical catch chute cut median residence below 0.5 seconds; the current test asserts at least eight exits, no more than eight simultaneous occupants and median residence under three seconds. The constructor now releases **one** initial marble, followed by a clearance-checked schedule at 0.48 per simulated second by default (about 2.083 seconds between releases). Unused spawn credit cannot produce a catch-up burst.
 
-## What the tests actually prove
+A previous post-funnel rail physically intersected the loop collider. Removing only the loop collider isolated the obstruction, but deleting the collider would defeat the physics requirement. We instead routed a separated, descending U-turn, extracted its centerline into `src/route-geometry.js`, and added a regression requiring the lead marble to approach the loop entrance within 18 simulated seconds while leaving the loop collider enabled. An alternate diagonal depth-lane merge **failed** that trial and raised losses, so it was reverted with its history retained. The remaining loop entrance still stops the lead marble; loop completion is not established.
 
-The suite verifies predictable step and gate trajectories, 120 Hz finite-state simulation, no instantaneous funnel relocation, bounded peak energy over 50 simulated seconds, actual water entry, stage coverage through the pool and lower return, and a buildable static website. The stage tracker reports `loopProximity`, which is **not** proof of successfully traversing the loop. Trampoline proximity is not proof of a controlled launch. No test yet establishes a successful elevator lift, one uninterrupted closed circuit, thermal sustainability, Safari/WebGPU/WebGL compatibility, true glass optics, or real water dynamics.
+Rapier `addForce()` persists until cleared, so water and conveyor forces are recomputed after `resetForces(false)` each fixed step. This fixed an earlier runaway-energy bug. API reference: https://rapier.rs/docs/user_guides/javascript/rigid_body_forces_and_impulses/ .
 
-## Design and performance rules
+## What tests mean—and do not mean
 
-1. Simulate in one metric coordinate system, maintain stable IDs, and separate fixed-step physics, interpolated rendering, and controls. Do not use React state updates for every ball on every frame.
-2. Compare WebGPU/WebGL 2 at identical resolution, geometry, scene, simulation, light and quality; a toggle alone is not a benchmark.
-3. Measure rAF cadence, p50/p95 intervals, CPU physics time, rendered megapixels, and sustained performance on the actual iPhone; don't infer browser memory limits from phone physical RAM.
-4. Batch common meshes, share geometry/materials, avoid duplicate graphics contexts, avoid GPU readbacks for each marble, and load heavy optional assets only when necessary.
-5. Prefer contact geometry and motors over hidden teleportation or scripted velocity overrides; distinguish analytic buoyancy, height-field water, and volumetric fluid accurately.
+Current CI covers syntax, physical state continuity without funnel teleportation, bounded energy, water contact, individual funnel discharge/congestion, stable release cadence, follow-camera projection, motor trajectory, approach-to-loop entrance, and static production bundle creation. Stage `loopProximity` is not loop completion, and a nearby trampoline contact is not proof of a controlled rebound. No test yet proves a successful loop traversal, return from trampoline into water, elevator pickup, uninterrupted full circuit, visual correctness on an iPhone, cross-browser renderer support, thermal sustainability, real glass optics or real water dynamics.
 
-## Blocking production gates
+For mobile comparisons, use **identical** simulation pace, active marble count, resolution, camera, quality and scene while switching WebGPU/forced WebGL 2. Record renderer identity, rAF p50/p95, physics milliseconds/step, draw calls, rendered megapixels, screenshot correctness, and several minutes of sustained behavior. The Copy snapshot control now includes all simulation settings, including pace, so traces remain interpretable.
 
-Prove loop traversal, measured trampoline bounce, robust lift pickup and full recirculation; trace remaining marble losses. Validate all four touch/camera modes and both renderer backends on-device. Introduce the fluid-library experiment only after establishing a reproducible baseline. Record memory, graphical correctness, and p95 frame time before claiming performance improvements.
+## Next production gates
+
+Resolve the actual loop-entry collider overlap and prove an entire loop trajectory rather than vicinity. Measure trampoline-pad impulse and landing consistency using contact events; prove the elevator picks up an existing marble, lifts it, and returns it to the top without relocation. Trace remaining losses, confirm all four touch modes on an iPhone, profile both browser rendering backends and resource/context recovery, then consider expensive water/lighting effects only with a reproducible device baseline.
