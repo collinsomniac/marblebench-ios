@@ -6,8 +6,9 @@
  */
 export const VORTEX_PROFILE=Object.freeze({
   inner:.49,outer:1.55,throatY:3.74,rimY:4.99,
-  // The approach enters at the rear of the bowl; the rail arrives near +X.
-  inletAngle:-1.771,inletHalfAngle:.34,
+  // Actual incoming trajectory reaches r≈1.75, theta≈-2.39 before the guard;
+  // the inlet must open THERE, rather than at the end of the old rail.
+  inletAngle:-2.30,inletHalfAngle:.43,
   guardHeight:.51,guardRadius:1.585,
   radialSegments:30,angularSegments:128
 });
