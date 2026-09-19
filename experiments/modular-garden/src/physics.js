@@ -17,13 +17,13 @@ export class GardenSimulation{
     this.returnGuard=installReturnGuard(RAPIER,this.world,scene);
     this.overflowCatcher=installOverflowCatcher(RAPIER,this.world,scene);
     this.course.pieces.push({kind:'bumper',tag:'physical-return-bumper'},{kind:'catcher',tag:'physical-wide-water-outflow'});
-    this.balls=[];this.sequence=0;this.time=0;this.spawnAccumulator=0;this.losses=0;this.waterImpacts=0;
+    this.balls=[];this.sequence=0;this.time=0;this.spawnAccumulator=0;this.losses=0;this.waterImpacts=0;this.releaseTimes=[];
     this.stats={contacts:'engine-managed',steps:0};this.options={flow:.48,capacity:48,speed:1,water:true,gravity:9.81};
     this.sphereGeometry=new THREE.SphereGeometry(MARBLE_RADIUS,24,16);
     this.marbleMaterial=new THREE.MeshStandardMaterial({color:0xffffff,metalness:.08,roughness:.13});
     this.mesh=new THREE.InstancedMesh(this.sphereGeometry,this.marbleMaterial,96);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);this.mesh.frustumCulled=false;this.mesh.count=0;scene.add(this.mesh);
-    this.dummy=new THREE.Object3D();
+    this.dummy=new THREE.Object3D();this.colorDirty=true;
     this.colors=[0xf06464,0xf0c94e,0x47bed4,0xa77cdb,0x70d6ad,0xff925e].map(c=>new THREE.Color(c));
     this.shelf=this.world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(LIFT.x,LIFT.bottom,LIFT.z));
     const shelfRot={x:0,y:0,z:Math.sin(-.055/2),w:Math.cos(-.055/2)};
@@ -45,17 +45,22 @@ export class GardenSimulation{
     this.padMesh=this.makeDynamicBox(1.04,.18,.86,0xffd351);
     this.gear=new THREE.Mesh(new THREE.TorusGeometry(.30,.068,8,18),new THREE.MeshStandardMaterial({color:0x344c68,metalness:.45,roughness:.32}));
     this.gear.position.set(LIFT.x-.72,7.22,LIFT.z-.54);scene.add(this.gear);
-    for(let i=0;i<6;i++)this.spawn(initialPosition(i));this.syncInstances(1);
+    // A single visible lead marble, then natural timed releases. Previously six were
+    // created on the same frame and arrived at the vortex as a dense cluster.
+    this.spawn(initialPosition(0));this.syncInstances(1);
   }
   makeDynamicBox(x,y,z,color){const mesh=new THREE.Mesh(new THREE.BoxGeometry(x,y,z),new THREE.MeshStandardMaterial({color,roughness:.37,metalness:.07}));mesh.frustumCulled=false;this.scene.add(mesh);return mesh;}
   spawn(position){
     if(this.balls.length>=this.options.capacity)return null;
+    const clearance=2.05*MARBLE_RADIUS;
+    for(const existing of this.balls){const p=existing.body.translation();if(Math.hypot(p.x-position.x,p.y-position.y,p.z-position.z)<clearance)return null;}
     const R=this.R,body=this.world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(position.x,position.y,position.z).setLinearDamping(.008).setAngularDamping(.02).setCcdEnabled(true));
     this.world.createCollider(R.ColliderDesc.ball(MARBLE_RADIUS).setDensity(.72).setFriction(.42).setRestitution(.28),body);
-    const entity={id:++this.sequence,body,radius:MARBLE_RADIUS,color:this.sequence%this.colors.length,previous:{x:position.x,y:position.y,z:position.z},lastDirection:new THREE.Vector3(1,0,0),inWater:false};this.balls.push(entity);return entity;
+    const entity={id:++this.sequence,body,radius:MARBLE_RADIUS,color:this.sequence%this.colors.length,previous:{x:position.x,y:position.y,z:position.z},lastDirection:new THREE.Vector3(1,0,0),inWater:false};this.balls.push(entity);
+    this.releaseTimes.push(this.time);if(this.releaseTimes.length>64)this.releaseTimes.shift();this.colorDirty=true;return entity;
   }
-  addMarbles(n=1){let added=0;for(let i=0;i<n;i++){const position=initialPosition((this.sequence+i)%6);position.y+=Math.floor(i/6)*.37;if(!this.spawn(position))break;added++;}return added;}
-  removeBall(index,lost=false){const b=this.balls[index];this.world.removeRigidBody(b.body);this.balls.splice(index,1);if(lost)this.losses++;}
+  addMarbles(n=1){let added=0;for(let i=0;i<n;i++){const position=initialPosition(this.sequence%6);if(!this.spawn(position))break;added++;}return added;}
+  removeBall(index,lost=false){const b=this.balls[index];this.world.removeRigidBody(b.body);this.balls.splice(index,1);this.colorDirty=true;if(lost)this.losses++;}
   /** Exact spherical-cap displacement on a flat surface; flow and drag remain approximations. */
   applyBuoyancy(ball){
     if(!this.options.water){ball.inWater=false;return;}
@@ -72,7 +77,6 @@ export class GardenSimulation{
     const y=steppedLiftHeight(this.time);this.shelf.setNextKinematicTranslation({x:LIFT.x,y,z:LIFT.z});
     const open=liftGateOpening(this.time);this.gate.setNextKinematicTranslation({x:LIFT.x+.55,y:y+.22,z:LIFT.z-open*.95});
     for(const b of this.balls){
-      // Rapier addForce persists: clear and recalculate current and conveyor forces every tick.
       b.body.resetForces(false);
       const p=b.body.translation(),v=b.body.linvel();b.previous.x=p.x;b.previous.y=p.y;b.previous.z=p.z;
       if(p.y<.20&&p.y>-1.15&&p.x>-7.60&&p.x<7.66&&Math.abs(p.z-LIFT.z)<1.63){
@@ -82,7 +86,9 @@ export class GardenSimulation{
     }
     this.world.step();
     for(let i=this.balls.length-1;i>=0;i--){const p=this.balls[i].body.translation();if(!Number.isFinite(p.x+p.y+p.z)||p.y<-2.6||Math.abs(p.x)>10||Math.abs(p.z)>5)this.removeBall(i,true);}
-    this.spawnAccumulator+=this.options.flow*dt;while(this.spawnAccumulator>=1){this.spawnAccumulator--;this.addMarbles(1)}
+    // Never accumulate overdue spawn credit: capacity/traffic jams cannot cause a burst.
+    this.spawnAccumulator=Math.min(1,this.spawnAccumulator+this.options.flow*dt);
+    if(this.spawnAccumulator>=1&&this.addMarbles(1))this.spawnAccumulator=0;
     while(this.balls.length>this.options.capacity)this.removeBall(this.balls.length-1);
     this.stats.steps++;
     const q=this.pad.rotation();this.padMesh.position.copy(this.pad.translation());this.padMesh.quaternion.set(q.x,q.y,q.z,q.w);
@@ -94,10 +100,13 @@ export class GardenSimulation{
     for(let i=0;i<this.balls.length;i++){
       const b=this.balls[i],p=b.body.translation(),rot=b.body.rotation();
       dummy.position.set(b.previous.x+(p.x-b.previous.x)*alpha,b.previous.y+(p.y-b.previous.y)*alpha,b.previous.z+(p.z-b.previous.z)*alpha);
-      dummy.quaternion.set(rot.x,rot.y,rot.z,rot.w);dummy.scale.setScalar(b.id===firstPersonId?.id?0:1);dummy.updateMatrix();this.mesh.setMatrixAt(i,dummy.matrix);this.mesh.setColorAt(i,this.colors[b.color]);
+      dummy.quaternion.set(rot.x,rot.y,rot.z,rot.w);dummy.scale.setScalar(b.id===firstPersonId?.id?0:1);dummy.updateMatrix();this.mesh.setMatrixAt(i,dummy.matrix);
+      if(this.colorDirty)this.mesh.setColorAt(i,this.colors[b.color]);
     }
-    this.mesh.instanceMatrix.needsUpdate=true;if(this.mesh.instanceColor)this.mesh.instanceColor.needsUpdate=true;
+    this.mesh.instanceMatrix.needsUpdate=true;
+    if(this.colorDirty&&this.mesh.instanceColor)this.mesh.instanceColor.needsUpdate=true;
+    this.colorDirty=false;
   }
-  snapshot(){return{balls:this.balls.length,steps:this.stats.steps,losses:this.losses,waterImpacts:this.waterImpacts,activeLiftHeight:steppedLiftHeight(this.time),ratchet:ratchetStage(this.time)};}
+  snapshot(){return{balls:this.balls.length,spawned:this.sequence,releaseTimes:this.releaseTimes.slice(-8),steps:this.stats.steps,losses:this.losses,waterImpacts:this.waterImpacts,activeLiftHeight:steppedLiftHeight(this.time),ratchet:ratchetStage(this.time)};}
   dispose(){for(let i=this.balls.length-1;i>=0;i--)this.removeBall(i);this.mesh.geometry.dispose();this.marbleMaterial.dispose();this.returnGuard.mesh.geometry.dispose();this.returnGuard.mesh.material.dispose();this.overflowCatcher.dispose();}
 }
