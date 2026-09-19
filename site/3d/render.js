@@ -106,7 +106,7 @@ export function makeRenderer(canvas){const gl=canvas.getContext('webgl2',{alpha:
  gl.bindBuffer(gl.ARRAY_BUFFER,water.instances);gl.bufferSubData(gl.ARRAY_BUFFER,0,water.data.subarray(0,10));
  const pv=gl.createVertexArray(),pb=gl.createBuffer();gl.bindVertexArray(pv);gl.bindBuffer(gl.ARRAY_BUFFER,pb);gl.bufferData(gl.ARRAY_BUFFER,400*5*4,gl.DYNAMIC_DRAW);
  gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,20,0);gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,1,gl.FLOAT,false,20,12);gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,1,gl.FLOAT,false,20,16);gl.bindVertexArray(null);
- const timer=gl.getExtension('EXT_disjoint_timer_query_webgl2');let query=null,gpuMs=null;
+ const timer=gl.getExtension('EXT_disjoint_timer_query_webgl2');let query=null,gpuMs=null,measuring=false;
  gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.disable(gl.CULL_FACE);
  const uniforms=new Map();const get=(p,name)=>{let t=uniforms.get(p);if(!t){t={};uniforms.set(p,t)}return t[name]||(t[name]=gl.getUniformLocation(p,name))};
  const renderer={gl,gpuMs:null,width:0,height:0,draws:0,displayScale:1,camera:{yaw:.39,pitch:.18,zoom:1,orbit:true},lost:false};
@@ -125,7 +125,7 @@ export function makeRenderer(canvas){const gl=canvas.getContext('webgl2',{alpha:
      if(!gl.getParameter(timer.GPU_DISJOINT_EXT))gpuMs=gl.getQueryParameter(query,gl.QUERY_RESULT)*1e-6;
      gl.deleteQuery(query);query=null;
    }
-   if(timer&&!query){query=gl.createQuery();gl.beginQuery(timer.TIME_ELAPSED_EXT,query)}
+   if(timer&&!query){query=gl.createQuery();gl.beginQuery(timer.TIME_ELAPSED_EXT,query);measuring=true}
    gl.clearColor(.025,.085,.122,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);let draws=0;
    const use=(p)=>{gl.useProgram(p);gl.uniformMatrix4fv(get(p,'uView'),false,V);gl.uniformMatrix4fv(get(p,'uProj'),false,P)};
    const draw=(bt,count)=>{if(!count)return;gl.bindVertexArray(bt.vao);gl.drawElementsInstanced(gl.TRIANGLES,bt.indexCount,gl.UNSIGNED_SHORT,0,count);draws++};
@@ -150,7 +150,7 @@ export function makeRenderer(canvas){const gl=canvas.getContext('webgl2',{alpha:
      gl.uniform1f(get(particleProgram,'uDpr'),renderer.displayScale);
      gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.depthMask(false);gl.bindVertexArray(pv);gl.drawArrays(gl.POINTS,0,sim.droplets.length);gl.depthMask(true);gl.disable(gl.BLEND);draws++;
    }
-   if(timer&&query)gl.endQuery(timer.TIME_ELAPSED_EXT);
+   if(measuring){gl.endQuery(timer.TIME_ELAPSED_EXT);measuring=false;}
    renderer.gpuMs=gpuMs;renderer.draws=draws;gl.bindVertexArray(null);
  };
  return renderer;
