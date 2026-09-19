@@ -3,7 +3,12 @@ import {makeRenderer} from './render.js';
 const $=id=>document.getElementById(id);
 const canvas=$('world'),panel=$('panel'),loader=$('loading'),bar=$('bar');
 const setProgress=(p,text)=>{bar.style.width=`${p}%`;$('phase').textContent=text;$('progressText').textContent=`${p}% · actual initialization phases`};
-const sim=makeSimulation();let renderer,paused=false,last=0,acc=0,dropped=0,steps=0,physicalMs=0,renderMs=0,lastStats=0,frames=0,frameTimes=[],lastRaf=0,rafCount=0;
+const sim=makeSimulation();
+// Presentation policy: no decorative fountain or impact spray. Retain the
+// particle implementation only as a separately testable reference for now.
+sim.options.particles=false;
+sim.options.spray=0;
+let renderer,paused=false,last=0,acc=0,dropped=0,steps=0,physicalMs=0,renderMs=0,lastStats=0,frames=0,frameTimes=[],lastRaf=0,rafCount=0;
 let initError=null;
 function showError(error){initError=String(error?.message||error);$('phase').textContent='Graphics initialization failed';$('progressText').textContent=initError;$('loadError').textContent='This 3D build requires WebGL 2. Open the HTTPS version in Safari or Chrome. The original 2D game is still available at the site root.';
  $('indicator').classList.add('bad');console.error(error)}
@@ -23,6 +28,10 @@ function setupInputs(){const tune=$('settings');const open=value=>{panel.hidden=
  $('water').addEventListener('change',e=>sim.options.water=e.target.checked);
  $('particles').addEventListener('change',e=>sim.options.particles=e.target.checked);
  $('diagnostics').addEventListener('change',e=>{$('panel').querySelector('.readout').hidden=!e.target.checked});
+ // Remove the experimental fountain controls as well as its work from normal play.
+ $('spray').value='0';$('sprayValue').textContent='0';$('spray').hidden=true;
+ $('spray').previousElementSibling.hidden=true;
+ $('particles').checked=false;$('particles').closest('label').hidden=true;
  let points=new Map(),lastDistance=0,pointerMoved=false,down=null;
  const dist=()=>{const v=[...points.values()];return v.length===2?Math.hypot(v[0].x-v[1].x,v[0].y-v[1].y):0};
  canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);points.set(e.pointerId,{x:e.clientX,y:e.clientY});down={x:e.clientX,y:e.clientY};pointerMoved=false;lastDistance=dist()});
