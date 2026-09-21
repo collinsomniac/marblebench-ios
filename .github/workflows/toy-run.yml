@@ -1,0 +1,29 @@
+name: Validate toy-run redesign
+on:
+  push:
+    branches: [redesign/nostalgic-marble-run]
+    paths: ['experiments/toy-run/**', '.github/workflows/toy-run.yml']
+  pull_request:
+    paths: ['experiments/toy-run/**', '.github/workflows/toy-run.yml']
+permissions:
+  contents: read
+jobs:
+  physics-and-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experiments/toy-run
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: experiments/toy-run/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: marble-works-static-preview
+          path: experiments/toy-run/dist

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f4f0e6" />
+    <title>Marble Works · MarbleBench</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="world" aria-label="Interactive multicolor marble run"></canvas>
+    <header>
+      <a class="brand" href="./" aria-label="Marble Works home"
+        ><span class="logo"><i></i><i></i><i></i></span
+        ><span
+          >MARBLE<br />WORKS<span class="byline"
+            >A LITTLE WORLD IN MOTION</span
+          ></span
+        ></a
+      ><button id="settings" aria-expanded="false" aria-controls="panel">
+        Controls <span>☷</span>
+      </button>
+    </header>
+    <div id="caption">
+      <span class="eyebrow">01 / THE RAINBOW MACHINE</span>
+      <h1>Let gravity<br />do its thing.</h1>
+      <p>
+        Drop a marble. Follow the journey.<br />A familiar toy, with a little
+        more possibility.
+      </p>
+    </div>
+    <div id="status" aria-live="off">
+      <span class="status-dot"></span
+      ><span id="readout">Assembling your marble run…</span>
+    </div>
+    <nav id="dock" aria-label="Marble controls">
+      <button id="add" class="primary">＋ Drop marble</button
+      ><button id="pause" aria-label="Pause simulation">Ⅱ</button
+      ><span class="divider"></span
+      ><select id="mode" aria-label="Camera mode">
+        <option value="orbit">Orbit view</option>
+        <option value="explore">Explore</option>
+        <option value="third">Follow marble</option>
+        <option value="first">Marble's eye</option></select
+      ><button id="next" hidden aria-label="Follow next marble">Next ↗</button
+      ><button id="reset" aria-label="Reset simulation">↺</button>
+    </nav>
+    <div id="hint">DRAG TO ORBIT <span>·</span> SCROLL OR PINCH TO EXPLORE</div>
+    <div id="movement" hidden role="group" aria-label="Explore movement pad">
+      <div id="thumb"></div>
+    </div>
+    <aside id="panel" hidden aria-label="Controls and diagnostics">
+      <div class="panel-head">
+        <h2>Make it your own.</h2>
+        <button id="close" aria-label="Close controls">×</button>
+      </div>
+      <p class="muted">
+        Play with the pace. Follow a marble. Look a little closer.
+      </p>
+      <label for="flow"
+        >Release rate <output id="flowVal">0.20 /s</output></label
+      ><input id="flow" type="range" min="0" max="1" step=".05" value=".2" />
+      <label for="capacity"
+        >Marbles in play <output id="capacityVal">6</output></label
+      ><input id="capacity" type="range" min="1" max="36" step="1" value="6" />
+      <label for="speed">Time scale <output id="speedVal">1.00×</output></label
+      ><input id="speed" type="range" min=".25" max="2" step=".05" value="1" />
+      <label for="quality"
+        >Render scale <output id="qualityVal">1.25×</output></label
+      ><input
+        id="quality"
+        type="range"
+        min=".75"
+        max="2"
+        step=".25"
+        value="1.25"
+      />
+      <label class="check"
+        ><span>Power the elevator</span
+        ><input id="elevator" type="checkbox" checked /></label
+      ><label class="check"
+        ><span>Water in the channel</span
+        ><input id="water" type="checkbox" checked
+      /></label>
+      <label for="backend">Graphics</label
+      ><select id="backend">
+        <option value="auto">Automatic · WebGPU preferred</option>
+        <option value="webgl2">WebGL 2 comparison</option></select
+      ><button id="reload">Apply graphics & restart</button>
+      <details>
+        <summary>Inside the machine</summary>
+        <p>
+          24 mm solid marbles, gravity, collision surfaces, and a powered lift.
+          The pool uses spherical-cap buoyancy and drag; its ripples are visual,
+          not a full fluid solver. Funnel rolling resistance is approximated by
+          angular damping.
+        </p>
+        <pre id="metrics">Waiting for the first frame.</pre>
+        <button id="copy">Copy benchmark snapshot</button>
+        <p id="build"></p>
+        <p>
+          High release rates are stress tests and can produce jams or escapes.
+          Lost marbles are counted, never teleported.
+        </p>
+      </details>
+    </aside>
+    <div id="loading" role="status">
+      <div class="loader-balls"><i></i><i></i><i></i></div>
+      <p id="phase">Unpacking the pieces…</p>
+      <button id="retry" hidden>Try again</button>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
