@@ -1,0 +1,70 @@
+name: Publish separate toy-run preview
+on:
+  push:
+    branches: [redesign/nostalgic-marble-run]
+    paths: ['experiments/toy-run/**', '.github/workflows/toy-preview.yml']
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  preview:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}toy/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: redesign
+      - uses: actions/checkout@v4
+        with:
+          ref: 1d2e0d6f696877f76f5b5e0bbfb6fd96a94cc7f7
+          path: baseline
+          persist-credentials: false
+      # Preserve the modular preview's currently deployed revision, not its
+      # newer experimental branch head with known failing regression tests.
+      - uses: actions/checkout@v4
+        with:
+          ref: e030e27daf674462f3ae5be048c74fa10ad9111f
+          path: modular
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate and build redesign
+        working-directory: redesign/experiments/toy-run
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build
+      - name: Build existing standalone routes
+        working-directory: baseline
+        run: python3 tools/build_3d.py
+      - name: Rebuild existing modular preview
+        working-directory: modular/experiments/modular-garden
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Assemble separate preview route
+        run: |
+          mkdir -p baseline/site/toy baseline/site/modular
+          cp -R redesign/experiments/toy-run/dist/. baseline/site/toy/
+          cp -R modular/experiments/modular-garden/dist/. baseline/site/modular/
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          Path('baseline/site/toy/build-info.json').write_text(json.dumps({'commit':os.environ['GITHUB_SHA']}))
+          Path('baseline/site/modular/build-info.json').write_text(json.dumps({'featureCommit':'e030e27daf674462f3ae5be048c74fa10ad9111f','pagesWorkflowCommit':os.environ['GITHUB_SHA']}))
+          for route in ['', '3d/', 'modular/', 'toy/']:
+              assert Path('baseline/site', route, 'index.html').is_file()
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: baseline/site
+      - id: deployment
+        uses: actions/deploy-pages@v4
