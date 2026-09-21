@@ -93,3 +93,52 @@ Relevant primary documentation:
 
 The production site should not replace the earlier routes until these acceptance
 limits are understood. A separate `/toy/` preview is the intended review surface.
+
+## Deployment and review update — 2026-09-21
+
+The initial preview job was rejected by the `github-pages` environment because
+`redesign/nostalgic-marble-run` is not an allowed deployment branch. The existing
+`main` Pages workflow now checks out an explicit tested toy commit and publishes
+it at `/marblebench-ios/toy/`. The modular route is pinned to its previously
+published `e030e27` revision and its regression suite remains a build gate. No
+environment restrictions were changed. To release a later toy revision, validate
+it, update the pinned checkout in the main workflow, then verify build-info.json.
+The redundant branch deployment workflow was removed; branch CI still tests and
+uploads the static build for review.
+
+The cloud browser reached the deployed HTML and loaded the application, but both
+automatic WebGPU fallback and explicit WebGL 2 failed to create a graphics
+context. This is an observed limitation of that browser session, not evidence
+of iPhone parity or an iPhone failure. Startup now reports graphics unavailability
+clearly, offers WebGL 2 retry and a downloadable error report. Chunk-load failures
+also offer retry. A failed renderer initialization no longer triggers a second
+initialization through the animation-loop shutdown path.
+
+Code review fixed stale instanced-marble culling, missing Explore keyboard input,
+reversed strafing, sticky movement after blur, reset framing and camera-selector
+synchronization. Draw counts now use per-frame drawCalls, backend labels survive
+minification, pause avoids redundant water updates, and hidden-tab transitions
+reset diagnostic windows. Nine tests cover physics, geometry and camera behavior.
+
+Controls → Inside the machine → Save benchmark JSON exports up to 60 recent
+measurement windows, actual window durations, frame p50/p95, physics CPU time,
+dropped simulated time, backend, backing resolution, settings, stage/loss counts,
+browser user agent and source commit. It makes no network upload. A failure report
+is available even before rendering starts. This is a diagnostic capture, not yet
+a controlled automatic benchmark suite.
+
+Next priorities, in order:
+
+1. Verify rendered startup, orbit/follow/first-person visibility, touch input,
+   background/resume and repeated reset on iPhone Safari and Chrome. Capture both
+   graphics backends at identical scene, time scale and resolution settings.
+2. Validate the mechanical appearance and physical/visual clearances before adding
+   more toys. Keep the passing six-marble circuit as a regression fixture.
+3. Add a reproducible benchmark runner with warm-up and fixed scenarios, avoiding
+   combined percentiles from per-window percentiles. Use phone data to decide
+   whether physics, fill rate, materials or startup dominates.
+4. Evaluate external WASM delivery: the embedded Rapier physics chunk remains
+   about 1.08 MB gzip, versus about 184 KB gzip for Three. Worker migration and
+   WebGPU compute require evidence of a bottleneck; neither is an automatic win.
+5. Expand the measured piece catalogue, water containment and validated population
+   envelope, then consider switches, paddle wheels and a construction editor.

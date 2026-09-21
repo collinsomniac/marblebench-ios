@@ -47,3 +47,14 @@ prints trajectories and bounded events; set `FLOW`, `CAPACITY`, and `SECONDS` to
 change its scenario. These are simulated-time results, **not mobile FPS claims**.
 
 See [design and architecture](docs/DESIGN.md) for sources, tradeoffs and remaining work.
+
+## Live preview and diagnostics
+
+[Open Marble Works](https://collinsomniac.github.io/marblebench-ios/toy/).
+The protected `main` Pages workflow publishes a pinned toy revision; the redesign
+PR remains a separate review branch. The browser validation limitations are in
+[the deployment update](docs/DESIGN.md#deployment-and-review-update--2026-09-21).
+
+Use **Controls → Inside the machine → Save benchmark JSON** to save recent
+measurements on your phone. A startup failure has its own **Save diagnostic report**
+button. Reports stay on your device unless you choose to share them.

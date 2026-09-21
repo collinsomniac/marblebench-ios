@@ -32,6 +32,7 @@ export class CameraRig {
     this.lookYaw = 0;
     this.lookPitch = 0;
     this.move = { x: 0, y: 0 };
+    this.keys = new Set();
     this.pointers = new Map();
     this.padPointer = null;
     this.lastPinch = 0;
@@ -64,11 +65,29 @@ export class CameraRig {
     this.lookYaw = 0;
     this.lookPitch = 0;
     this.pad.hidden = mode !== "explore";
+    this.keys.clear();
     this.move.x = this.move.y = 0;
     this.thumb.style.transform = "translate(0px,0px)";
     this.pointers.clear();
     this.lastPinch = 0;
     return mode;
+  }
+  resetView(balls = []) {
+    this.target.set(0, 0.6, 0.2);
+    this.yaw = 0.3;
+    this.pitch = 0.18;
+    this.distance = fitOrbitDistance(this.camera.aspect, this.baseFov);
+    this.focusId = null;
+    this.setMode("orbit", balls);
+    this.clearInput();
+  }
+  clearInput() {
+    this.keys.clear();
+    this.pointers.clear();
+    this.padPointer = null;
+    this.lastPinch = 0;
+    this.move.x = this.move.y = 0;
+    this.thumb.style.transform = "translate(0px,0px)";
   }
   nextMarble(balls) {
     if (!balls.length) return null;
@@ -78,6 +97,31 @@ export class CameraRig {
   }
   bind() {
     const canvas = this.canvas;
+    const movementKeys = new Set([
+      "KeyW",
+      "KeyA",
+      "KeyS",
+      "KeyD",
+      "ArrowUp",
+      "ArrowLeft",
+      "ArrowDown",
+      "ArrowRight",
+    ]);
+    window.addEventListener("keydown", (e) => {
+      if (
+        this.mode !== "explore" ||
+        !movementKeys.has(e.code) ||
+        e.target.closest?.("input,select,button,textarea,[contenteditable]")
+      )
+        return;
+      e.preventDefault();
+      this.keys.add(e.code);
+    });
+    window.addEventListener("keyup", (e) => this.keys.delete(e.code));
+    window.addEventListener("blur", () => this.clearInput());
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) this.clearInput();
+    });
     canvas.style.touchAction = "none";
     canvas.addEventListener("pointerdown", (e) => {
       if (e.pointerType === "mouse" && e.button !== 0 && e.button !== 2) return;
@@ -197,10 +241,17 @@ export class CameraRig {
     }
     if (this.mode === "explore") {
       forward.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-      right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+      right.set(-Math.cos(this.yaw), 0, Math.sin(this.yaw));
       const speed = 0.45 * dt;
-      this.eye.addScaledVector(forward, speed * this.move.y);
-      this.eye.addScaledVector(right, speed * this.move.x);
+      const down = (...codes) =>
+        codes.some((code) => this.keys.has(code)) ? 1 : 0;
+      const x =
+        this.move.x + down("KeyD", "ArrowRight") - down("KeyA", "ArrowLeft");
+      const y =
+        this.move.y + down("KeyW", "ArrowUp") - down("KeyS", "ArrowDown");
+      const norm = Math.max(1, Math.hypot(x, y));
+      this.eye.addScaledVector(forward, (speed * y) / norm);
+      this.eye.addScaledVector(right, (speed * x) / norm);
       this.eye.y = clamp(this.eye.y, 0.065, 1.4);
       this.camera.position.lerp(this.eye, blend);
       point.set(

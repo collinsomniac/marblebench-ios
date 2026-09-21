@@ -45,6 +45,9 @@ export class ToySimulation {
     });
     this.mesh = new THREE.InstancedMesh(sphere, this.marbleMaterial, 96);
     this.mesh.count = 0;
+    // Instances move across the course; a cached spawn-time bounding sphere
+    // would wrongly cull every marble when following one away from the feed.
+    this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(this.mesh);
     this.dummy = new THREE.Object3D();

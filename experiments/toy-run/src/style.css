@@ -420,3 +420,27 @@ pre {
     padding: 10px 13px;
   }
 }
+
+#loading p {
+  max-width: 520px;
+  padding: 0 24px;
+  text-align: center;
+  line-height: 1.6;
+}
+#loading button {
+  margin-top: 8px;
+}
+#save {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 11px;
+}
+@media (max-width: 550px) {
+  #dock {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #dock select {
+    max-width: 105px;
+  }
+}

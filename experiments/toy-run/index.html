@@ -100,6 +100,7 @@
         </p>
         <pre id="metrics">Waiting for the first frame.</pre>
         <button id="copy">Copy benchmark snapshot</button>
+        <button id="save">Save benchmark JSON</button>
         <p id="build"></p>
         <p>
           High release rates are stress tests and can produce jams or escapes.
@@ -111,7 +112,9 @@
       <div class="loader-balls"><i></i><i></i><i></i></div>
       <p id="phase">Unpacking the pieces…</p>
       <button id="retry" hidden>Try again</button>
+      <button id="fallback" hidden>Try WebGL 2</button>
+      <button id="save-error" hidden>Save diagnostic report</button>
     </div>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/boot.js"></script>
   </body>
 </html>

@@ -12,14 +12,12 @@ for (let i = 0; i < 240 * Number(process.env.SECONDS ?? 40); i++) {
       JSON.stringify({
         t: sim.time.toFixed(2),
         lift: sim.lift.phase,
-        balls: sim.balls
-          .slice(0, 3)
-          .map((b) => ({
-            id: b.id,
-            stage: b.stage,
-            p: b.body.translation(),
-            v: b.body.linvel(),
-          })),
+        balls: sim.balls.slice(0, 3).map((b) => ({
+          id: b.id,
+          stage: b.stage,
+          p: b.body.translation(),
+          v: b.body.linvel(),
+        })),
       }),
     );
 }

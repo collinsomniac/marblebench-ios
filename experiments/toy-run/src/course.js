@@ -285,8 +285,6 @@ export function createCourse(R, world, scene) {
         if (owned.includes(m)) m.material.dispose();
       }
       materials.forEach((m) => m.dispose());
-      baseMat.dispose();
-      waterMat.dispose();
     },
   };
 }
