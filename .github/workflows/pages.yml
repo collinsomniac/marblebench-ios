@@ -67,7 +67,7 @@ jobs:
       - name: Check out validated toy redesign
         uses: actions/checkout@v4
         with:
-          ref: 6a4af88223798efde944cd3c8d283b0b42883289
+          ref: 62b6b303d730f7a4add80d3f8457f268378a5f4b
           path: toy-preview-src
           persist-credentials: false
       - name: Test and build Marble Works
