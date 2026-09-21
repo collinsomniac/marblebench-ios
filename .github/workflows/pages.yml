@@ -34,7 +34,7 @@ jobs:
       - name: Check out separate experimental branch without merging into main
         uses: actions/checkout@v4
         with:
-          ref: feature/modular-garden-v2
+          ref: e030e27daf674462f3ae5be048c74fa10ad9111f # preserve deployed modular revision
           path: modular-preview-src
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -64,6 +64,29 @@ jobs:
           find site/modular/assets -maxdepth 1 -name '*.js' -size +100k -print -quit | grep -q .
           printf '{"featureCommit":"%s","pagesWorkflowCommit":"%s"}\n' "$(git -C modular-preview-src rev-parse HEAD)" "$GITHUB_SHA" > site/modular/build-info.json
           cat site/modular/build-info.json
+      - name: Check out validated toy redesign
+        uses: actions/checkout@v4
+        with:
+          ref: 6a4af88223798efde944cd3c8d283b0b42883289
+          path: toy-preview-src
+          persist-credentials: false
+      - name: Test and build Marble Works
+        working-directory: toy-preview-src/experiments/toy-run
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+          npm run build
+      - name: Add separate toy route and identify its source
+        run: |
+          mkdir -p site/toy
+          cp -R toy-preview-src/experiments/toy-run/dist/. site/toy/
+          test -s site/toy/index.html
+          python3 - <<'PYINFO'
+          import json, os, subprocess
+          from pathlib import Path
+          commit = subprocess.check_output(['git','-C','toy-preview-src','rev-parse','HEAD'],text=True).strip()
+          Path('site/toy/build-info.json').write_text(json.dumps({'commit':commit,'pagesWorkflowCommit':os.environ['GITHUB_SHA']}))
+          PYINFO
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
